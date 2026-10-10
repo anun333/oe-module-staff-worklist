@@ -1,0 +1,49 @@
+{
+    "name": "anun333/oe-module-staff-worklist",
+    "description": "One queue of outstanding staff work across patients for OpenEMR: unsigned results, orders with no result, referrals with no reply, and care gaps for upcoming visits",
+    "type": "openemr-module",
+    "license": "GPL-3.0-or-later",
+    "keywords": [
+        "openemr",
+        "openemr-module",
+        "worklist",
+        "results",
+        "referrals",
+        "care-gaps"
+    ],
+    "authors": [
+        {
+            "name": "anun333",
+            "email": "anun333@posteo.net"
+        }
+    ],
+    "require": {
+        "php": ">=8.3",
+        "openemr/oe-module-installer-plugin": "^0.1.5"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "OpenHealthcare\\StaffWorklist\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "OpenHealthcare\\StaffWorklist\\Tests\\": "tests/"
+        },
+        "files": [
+            "tests/stubs.php"
+        ]
+    },
+    "config": {
+        "allow-plugins": {
+            "openemr/oe-module-installer-plugin": true
+        }
+    },
+    "support": {
+        "issues": "https://github.com/anun333/oe-module-staff-worklist/issues",
+        "source": "https://github.com/anun333/oe-module-staff-worklist"
+    }
+}

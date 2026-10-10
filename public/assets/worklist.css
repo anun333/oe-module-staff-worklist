@@ -1,0 +1,21 @@
+.worklist-table td {
+  vertical-align: middle;
+}
+
+.worklist-note {
+  border-left: 3px solid var(--info, #17a2b8);
+  padding-left: 0.4rem;
+  margin-top: 0.2rem;
+}
+
+.worklist-table .badge {
+  min-width: 4.5rem;
+}
+
+.worklist-table .js-open-chart {
+  white-space: nowrap;
+}
+
+.worklist-sites {
+  min-width: 16rem;
+}
