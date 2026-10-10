@@ -2,7 +2,7 @@
 
 One queue of outstanding staff work across all patients, so nobody has to check four separate reports.
 
-**Status: 0.1.0, a pre-release.** Tested on OpenEMR with synthetic data only (see [Compatibility](#compatibility)). It lists many patients' work on one page, so read [Access](#access) and [FOOTPRINT.md](FOOTPRINT.md) before installing, and check access with your own users first.
+**Status: 0.1.1, a pre-release.** Tested on OpenEMR with synthetic data only, access checks included (see [Compatibility](#compatibility)). It lists many patients' work on one page, so read [Access](#access) and [FOOTPRINT.md](FOOTPRINT.md) before installing, and try it with your own users and settings before giving staff access.
 
 | Tab | Listed when | Leaves the list when | Default owner |
 |---|---|---|---|
@@ -100,28 +100,30 @@ Who sees what:
 - **Sensitive visits:** see [Safety and privacy behaviour](#safety-and-privacy-behaviour).
 - **Sites:** with **Restrict Users to Facilities** on, see [Who can see which sites](#who-can-see-which-sites).
 
-How that has been checked:
+How that has been checked, on 2026-10-10, on OpenEMR 8.4.1 and current master (8.5.0-dev), with synthetic data and test logins created and removed for the run:
 
 - The rules are unit-tested (`tests/ComplianceRulesTest.php`, `tests/ActionRulesTest.php`): sensitivity masking, which actions masked items allow, site counts, snooze and dismiss limits.
-- The end-to-end check with restricted users on a running OpenEMR has **not yet been done for 0.1.0**. Until it has, check these in your own install before giving staff access:
-  1. A user without `patients/med` gets no menu entry and an access-denied page at the worklist URL.
-  2. A user with `patients/med` but not write sees the list, and gets no Assign, Snooze or Dismiss buttons; posting an action anyway is refused.
-  3. A user without the "High" sensitivity sees a result from a High-sensitivity visit as "Restricted", can't open it, and can only assign it to someone who holds that level.
-  4. With Restrict Users to Facilities on, a user limited to one facility sees only that facility's work, plus work they own or were assigned, and can't assign work to someone restricted elsewhere.
+- End to end, against a running OpenEMR, the five checks below all passed:
+  1. A user without `patients/med` (Front Office) gets no menu entry, a 403 access-denied page at the worklist URL, and an action posted with a valid session token is refused by the permission check.
+  2. A user with `patients/med` at view only sees the list, with no assign, snooze, dismiss or reopen controls and no action form; an action posted anyway is refused by the permission check.
+  3. A user without the "High" sensitivity (Clinicians) sees a result from a High-sensitivity visit as "Restricted", without its test name, can't snooze it, can't assign it to someone who also lacks that level, and can assign it to someone who holds it.
+  4. With Restrict Users to Facilities on, a facility-limited user sees only that facility's work plus work they were assigned, counts include only that work, work at other sites can't be acted on and isn't revealed, and work can't be assigned to someone restricted elsewhere.
   5. Each worklist view appears in Admin › Logs as `patient-record-select`, with the patients listed.
+
+The same five are worth repeating in your own install, with your own groups and facilities, before giving staff access: your ACL setup isn't the stock one the checks used.
 
 ## Compatibility
 
 Tested with synthetic data on:
 
-| OpenEMR | install by Composer and Module Manager | queues |
-|---|---|---|
-| 8.4.1 (Docker image `openemr/openemr:8.4.1`) | passes | passes |
-| 8.5.0-dev, master as of 2026-10-09 (Docker image `openemr/openemr:8.5.0`, database version 548) | passes | passes |
+| OpenEMR | install by Composer and Module Manager | queues | access |
+|---|---|---|---|
+| 8.4.1 (Docker image `openemr/openemr:8.4.1`) | passes (GitHub and Packagist) | passes | passes |
+| 8.5.0-dev, master as of 2026-10-09 (Docker image `openemr/openemr:8.5.0`, database version 548) | passes (GitHub) | passes | passes |
 
 **Install** means a fresh OpenEMR that installed itself, then `composer require` from this repository, then Register, Install and Enable in Modules › Manage Modules. Each step's effect was checked: where the files went, the three tables, the background service switching on (and off again when disabled), the menu entry and the permission it requires, the page rendering, and no PHP warnings from the module in Apache's logs.
 
-**Queues** means synthetic patients covering each queue, and the page and action endpoint driven as an administrator. Items appear with the right priority and site, actions work and are logged, signing a result or cancelling a visit clears its items, and the site picker narrows the list. Access checks with restricted users weren't part of this; see [Access](#access).
+**Queues** means synthetic patients covering each queue, and the page and action endpoint driven as an administrator. Items appear with the right priority and site, actions work and are logged, signing a result or cancelling a visit clears its items, and the site picker narrows the list. **Access** means the five checks listed under [Access](#access).
 
 ## Development
 
