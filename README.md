@@ -114,7 +114,14 @@ How that has been checked:
 
 Tested with synthetic data on:
 
-<!-- COMPATIBILITY: filled in after the install checks -->
+| OpenEMR | install by Composer and Module Manager | queues |
+|---|---|---|
+| 8.4.1 (Docker image `openemr/openemr:8.4.1`) | passes | passes |
+| 8.5.0-dev, master as of 2026-10-09 (Docker image `openemr/openemr:8.5.0`, database version 548) | passes | passes |
+
+**Install** means a fresh OpenEMR that installed itself, then `composer require` from this repository, then Register, Install and Enable in Modules › Manage Modules. Each step's effect was checked: where the files went, the three tables, the background service switching on (and off again when disabled), the menu entry and the permission it requires, the page rendering, and no PHP warnings from the module in Apache's logs.
+
+**Queues** means synthetic patients covering each queue, and the page and action endpoint driven as an administrator. Items appear with the right priority and site, actions work and are logged, signing a result or cancelling a visit clears its items, and the site picker narrows the list. Access checks with restricted users weren't part of this; see [Access](#access).
 
 ## Development
 
