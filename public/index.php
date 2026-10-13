@@ -8,6 +8,10 @@
  */
 
 require_once __DIR__ . '/../../../../globals.php';
+// OpenEMR 8.3 autoloads library/user.inc.php (getUserSetting, setUserSetting); 8.1 and 8.2 don't.
+if (!function_exists('getUserSetting')) {
+    require_once dirname(__DIR__, 5) . '/library/user.inc.php';
+}
 
 use OpenEMR\Common\Acl\AccessDeniedHelper;
 use OpenEMR\Common\Acl\AclMain;

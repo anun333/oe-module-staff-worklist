@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2 (2026-10-12)
+
+- **Runs on OpenEMR 8.1.0 and 8.2.0.** The page failed there with "Call to undefined function getUserSetting()": OpenEMR loads `library/user.inc.php` for every page only from 8.3.0, so the page now loads it itself when it's missing. Checked on the official 8.1.0, 8.2.0, 8.3.0 and 8.4.0 images: installed through Module Manager, the page loads for an administrator with no PHP error.
+- The README's compatibility table now covers those releases, and says that 8.0.0 and older can't run it.
+
 ## 0.1.1 (2026-10-10)
 
 No code changes. The access checks are now verified end to end, on OpenEMR 8.4.1 and current master (8.5.0-dev), with synthetic data:

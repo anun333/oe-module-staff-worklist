@@ -120,6 +120,10 @@ Tested with synthetic data on:
 |---|---|---|---|
 | 8.4.1 (Docker image `openemr/openemr:8.4.1`) | passes (GitHub and Packagist) | passes | passes |
 | 8.5.0-dev, master as of 2026-10-09 (Docker image `openemr/openemr:8.5.0`, database version 548) | passes (GitHub) | passes | passes |
+| 8.4.0, 8.3.0, 8.2.0, 8.1.0 (official Docker images) | passes (Module Manager) | not tested | not tested |
+| 8.0.0 and older | won't run: it uses OpenEMR's `AccessDeniedHelper`, added in 8.1.0 | | |
+
+On 8.1.0, 8.2.0, 8.3.0 and 8.4.0 (checked 2026-10-12 with `dev/module_compat_check.sh` in the openhealthcare repository) the module was copied in, installed and enabled through Module Manager, and its page loaded for an administrator with no PHP error, on a fresh install with no patients. That's a smaller check than the 8.4.1 and master rows. 8.1 and 8.2 need the module to load OpenEMR's `library/user.inc.php` itself, which 8.3 started loading for every page; the page now does. The module needs PHP 8.3 or later, which 8.1 and 8.2 also run on.
 
 **Install** means a fresh OpenEMR that installed itself, then `composer require` from this repository, then Register, Install and Enable in Modules › Manage Modules. Each step's effect was checked: where the files went, the three tables, the background service switching on (and off again when disabled), the menu entry and the permission it requires, the page rendering, and no PHP warnings from the module in Apache's logs.
 
