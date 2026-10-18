@@ -28,6 +28,7 @@ use OpenHealthcare\StaffWorklist\Source\CareGapsSource;
 use OpenHealthcare\StaffWorklist\Source\OrdersMissingResultsSource;
 use OpenHealthcare\StaffWorklist\Source\ReferralsAwaitingReplySource;
 use OpenHealthcare\StaffWorklist\Source\ResultsAwaitingReviewSource;
+use OpenHealthcare\StaffWorklist\Source\ScreeningFollowUpSource;
 use OpenHealthcare\StaffWorklist\Source\WorkSourceInterface;
 
 final class WorklistService
@@ -74,6 +75,7 @@ final class WorklistService
                 new OrdersMissingResultsSource($policy, $now),
                 new ReferralsAwaitingReplySource($policy, $now),
                 new CareGapsSource($policy, new UpcomingVisits($now), new CareGapCache()),
+                new ScreeningFollowUpSource($now),
             ],
             new StateRepository(),
             new WorklistAssembler(),

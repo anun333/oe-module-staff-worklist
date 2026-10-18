@@ -21,8 +21,9 @@ final class ItemKey
     public const SOURCE_ORDER = 'order';
     public const SOURCE_REFERRAL = 'referral';
     public const SOURCE_CAREGAP = 'caregap';
+    public const SOURCE_SCREEN = 'screen';
 
-    private const PATTERN = '/^(result|order|referral|caregap):([1-9]\d{0,17}):([1-9]\d{0,17})$/D';
+    private const PATTERN = '/^(result|order|referral|caregap|screen):([1-9]\d{0,17}):([1-9]\d{0,17})$/D';
 
     public function __construct(
         public readonly string $source,

@@ -63,6 +63,7 @@ $sourceLabels = [
     ItemKey::SOURCE_ORDER => xl('No result yet'),
     ItemKey::SOURCE_REFERRAL => xl('Referral replies'),
     ItemKey::SOURCE_CAREGAP => xl('Care gaps, upcoming visits'),
+    ItemKey::SOURCE_SCREEN => xl('Screening follow-up'),
 ];
 $viewLabels = [
     ItemState::STATUS_OPEN => xl('Open'),
@@ -80,6 +81,7 @@ $ownerRoles = [
     ItemKey::SOURCE_ORDER => xl('Ordering provider'),
     ItemKey::SOURCE_REFERRAL => xl('Referring provider'),
     ItemKey::SOURCE_CAREGAP => xl('Visit provider'),
+    ItemKey::SOURCE_SCREEN => xl('Visit or patient\'s provider'),
 ];
 $priorityBadges = [
     WorkItem::PRIORITY_CRITICAL => ['badge-danger', xl('Critical')],
