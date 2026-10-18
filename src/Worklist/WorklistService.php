@@ -25,6 +25,7 @@ use OpenHealthcare\StaffWorklist\Repository\StateRepository;
 use OpenHealthcare\StaffWorklist\Repository\UpcomingVisits;
 use OpenHealthcare\StaffWorklist\Repository\UserDirectory;
 use OpenHealthcare\StaffWorklist\Source\CareGapsSource;
+use OpenHealthcare\StaffWorklist\Source\ClaimsFollowUpSource;
 use OpenHealthcare\StaffWorklist\Source\OrdersMissingResultsSource;
 use OpenHealthcare\StaffWorklist\Source\ReferralsAwaitingReplySource;
 use OpenHealthcare\StaffWorklist\Source\ResultsAwaitingReviewSource;
@@ -69,14 +70,19 @@ final class WorklistService
         require_once OEGlobalsBag::getInstance()->getSrcDir() . '/options.inc.php';
 
         $policy = new PriorityPolicy();
+        $sources = [
+            new ResultsAwaitingReviewSource($policy, $now, OEGlobalsBag::getInstance()->getBoolean('portal_onsite_two_enable')),
+            new OrdersMissingResultsSource($policy, $now),
+            new ReferralsAwaitingReplySource($policy, $now),
+            new CareGapsSource($policy, new UpcomingVisits($now), new CareGapCache()),
+            new ScreeningFollowUpSource($now),
+        ];
+        // Claims work only for users core's Billing Manager admits (interface/billing/billing_report.php).
+        if (AclMain::aclCheckCore('acct', 'eob', '', 'write') || AclMain::aclCheckCore('acct', 'bill', '', 'write')) {
+            $sources[] = new ClaimsFollowUpSource($policy, $now);
+        }
         return new self(
-            [
-                new ResultsAwaitingReviewSource($policy, $now, OEGlobalsBag::getInstance()->getBoolean('portal_onsite_two_enable')),
-                new OrdersMissingResultsSource($policy, $now),
-                new ReferralsAwaitingReplySource($policy, $now),
-                new CareGapsSource($policy, new UpcomingVisits($now), new CareGapCache()),
-                new ScreeningFollowUpSource($now),
-            ],
+            $sources,
             new StateRepository(),
             new WorklistAssembler(),
             new ActionRules(),
@@ -94,6 +100,12 @@ final class WorklistService
         }
         $states = $this->states->findByKeys(array_map(static fn(WorkItem $i): string => (string)$i->key, $items));
         return $this->assembler->assemble($items, $states, $filter, $today, $this->sites->accessFor($filter->userId));
+    }
+
+    /** Whether this worklist includes a source (the claims source depends on the user). */
+    public function hasSource(string $source): bool
+    {
+        return isset($this->sources[$source]);
     }
 
     public function rules(): ActionRules

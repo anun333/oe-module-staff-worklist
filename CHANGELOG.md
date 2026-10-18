@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0 (2026-10-18)
+
+- **New tab: Claims follow-up**, for billing staff. At most one row per visit:
+  - **Denied** (High): the visit's latest claim is a denial recorded by OpenEMR's ERA posting. When an 835 says a claim was denied, OpenEMR posts nothing, marks the claim denied and says "follow up manually"; until now, the denial showed only on that visit's row in the Billing Manager.
+  - **No payer response:** billed to an insurer more than 45 days ago, with that level still open and nothing posted at it since. High after 90 days.
+  - **Flagged for follow-up:** a line someone ticked Follow Up on in payment posting, with the note.
+- **Each row shows:** the payer, the service date, when the claim was billed or denied, and the denial reasons with OpenEMR's own descriptions. The button opens OpenEMR's posting page for the visit.
+- **Rows leave the list** when the claim is billed again, its level is closed, something is posted at that level, or the flag is unticked.
+- **Who sees it:** only users OpenEMR's Billing Manager admits (`acct/eob` or `acct/bill`, with write). For anyone else the tab, its counts and its actions aren't there.
+- **Tested:**
+  - **Isolated tests:** each kind and their precedence; each thing that clears a row; the 45-, 90- and 365-day limits; parsing the stored denial reasons. Two deliberate breaks of the rules each fail them.
+  - **On OpenEMR 8.4.1** with `dev/worklist_claims_check.py` in the openhealthcare repository: claims billed with OpenEMR's own `updateClaim`, and a synthetic 835 posted through OpenEMR's own ERA posting (a denial with CO-16, and a payment). It checks rows for the denial, claims billed 60 and 100 days ago, and a follow-up flag, and each row clearing. Everything added is removed.
+- No database change.
+
 ## 0.2.0 (2026-10-18)
 
 - **New tab: Screening follow-up.** It lists a patient's latest PHQ-2, PHQ-9, GAD-7 or AUDIT-C total from the last 180 days when it's at or above the instrument's published cut-off, with nothing coded after it. It reads the questionnaire responses OpenEMR's own runtime saves.

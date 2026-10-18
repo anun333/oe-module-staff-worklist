@@ -34,6 +34,12 @@ final class PriorityPolicy
         // How long a panic-value result may sit unsigned before the worklist calls it overdue.
         // Set to the clinic's critical-results policy.
         public readonly int $criticalOverdueHours = 4,
+        // A claim billed to an insurer with nothing posted at its level after this many days.
+        public readonly int $claimNoResponseDays = 45,
+        // ...and High priority after this many.
+        public readonly int $claimNoResponseHighDays = 90,
+        // Claims billed or denied longer ago than this aren't listed.
+        public readonly int $claimWindowDays = 365,
     ) {
     }
 

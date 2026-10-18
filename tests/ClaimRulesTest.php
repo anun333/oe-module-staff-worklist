@@ -1,0 +1,107 @@
+<?php
+
+declare(strict_types=1);
+
+namespace OpenHealthcare\StaffWorklist\Tests;
+
+use OpenHealthcare\StaffWorklist\Claims\ClaimRecord;
+use OpenHealthcare\StaffWorklist\Claims\ClaimRules;
+use OpenHealthcare\StaffWorklist\Model\WorkItem;
+use OpenHealthcare\StaffWorklist\Policy\PriorityPolicy;
+use PHPUnit\Framework\TestCase;
+
+final class ClaimRulesTest extends TestCase
+{
+    private const NOW = '2026-10-18 12:00:00';
+
+    public function testADenialIsHighPriorityAndDatedWhenItWasPosted(): void
+    {
+        $decision = $this->rules()->decide(self::claim(ClaimRecord::STATUS_DENIED, '2026-10-01 09:00:00'));
+
+        $this->assertSame(ClaimRules::DENIED, $decision['kind'] ?? null);
+        $this->assertSame(WorkItem::PRIORITY_HIGH, $decision['priority']);
+        $this->assertEquals(new \DateTimeImmutable('2026-10-01 09:00:00'), $decision['since']);
+    }
+
+    public function testADenialLeavesWhenTheLevelIsClosedSomethingIsPostedOrItIsBilledAgain(): void
+    {
+        $rules = $this->rules();
+        $this->assertNull($rules->decide(self::claim(ClaimRecord::STATUS_DENIED, '2026-10-01', lastLevelClosed: 1)), 'level closed');
+        $this->assertNull($rules->decide(self::claim(ClaimRecord::STATUS_DENIED, '2026-10-01', postedSince: true)), 'posted since');
+        // Billed again: the latest version is a fresh billing, not yet late.
+        $this->assertNull($rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-10-10')), 'rebilled');
+        // A denial at the secondary level stays open while only the primary is closed.
+        $this->assertSame(ClaimRules::DENIED, $rules->decide(self::claim(ClaimRecord::STATUS_DENIED, '2026-10-01', level: 2, lastLevelClosed: 1))['kind'] ?? null);
+    }
+
+    public function testNoResponseStartsAfter45DaysAndIsHighAfter90(): void
+    {
+        $rules = $this->rules();
+        $this->assertNull($rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-09-03 12:00:00')), '45 days: not yet');
+        $this->assertSame([ClaimRules::NO_RESPONSE, WorkItem::PRIORITY_NORMAL], self::kindAndPriority($rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-09-02 12:00:00'))), '46 days');
+        $this->assertSame([ClaimRules::NO_RESPONSE, WorkItem::PRIORITY_NORMAL], self::kindAndPriority($rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-07-20 12:00:00'))), '90 days');
+        $this->assertSame([ClaimRules::NO_RESPONSE, WorkItem::PRIORITY_HIGH], self::kindAndPriority($rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-07-19 12:00:00'))), '91 days');
+        $this->assertNull($rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-07-01', postedSince: true)), 'answered');
+        $this->assertNull($rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-07-01', level: 0)), 'billed to no insurer');
+    }
+
+    public function testClaimsOutsideTheYearAreLeftOut(): void
+    {
+        $this->assertNull($this->rules()->decide(self::claim(ClaimRecord::STATUS_DENIED, '2025-10-17 12:00:00')));
+        $this->assertNotNull($this->rules()->decide(self::claim(ClaimRecord::STATUS_DENIED, '2025-10-19 12:00:00')));
+    }
+
+    public function testAFlagIsListedOnItsOwnAndKeptAlongsideADenial(): void
+    {
+        $flags = [['note' => 'call payer', 'at' => new \DateTimeImmutable('2026-10-05')], ['note' => '', 'at' => new \DateTimeImmutable('2026-10-02')]];
+        $alone = $this->rules()->decide(self::claim(null, null, flags: $flags));
+        $this->assertSame([ClaimRules::FLAGGED, WorkItem::PRIORITY_NORMAL], self::kindAndPriority($alone));
+        $this->assertEquals(new \DateTimeImmutable('2026-10-02'), $alone['since'] ?? null, 'since the earliest flag');
+
+        $both = $this->rules()->decide(self::claim(ClaimRecord::STATUS_DENIED, '2026-10-01', flags: $flags));
+        $this->assertSame(ClaimRules::DENIED, $both['kind'] ?? null);
+        $this->assertTrue($both['flagged']);
+        // A flag on a claim that was answered still lists, as a flag.
+        $this->assertSame(ClaimRules::FLAGGED, $this->rules()->decide(self::claim(ClaimRecord::STATUS_DENIED, '2026-10-01', postedSince: true, flags: $flags))['kind'] ?? null);
+    }
+
+    public function testTheDenialReasonsAreReadAsOpenEmrStoresThem(): void
+    {
+        $this->assertSame(
+            [
+                ['code' => '99213', 'modifier' => '', 'group' => 'CO', 'reason' => '16'],
+                ['code' => '90471', 'modifier' => '25', 'group' => 'PR', 'reason' => '204'],
+            ],
+            ClaimRules::parseReasons('99213__CO_16,90471_25_PR_204,broken,a_b_c_,'),
+        );
+        $this->assertSame([], ClaimRules::parseReasons(''));
+        $this->assertSame('Claim/service lacks information.', ClaimRules::shortDescription('Claim/service lacks information. Usage: Do not use this code'));
+        $this->assertSame('Duplicate claim/service.', ClaimRules::shortDescription('Duplicate claim/service.'));
+    }
+
+    private function rules(): ClaimRules
+    {
+        return new ClaimRules(new PriorityPolicy(), new \DateTimeImmutable(self::NOW));
+    }
+
+    /** @param list<array{note: string, at: \DateTimeImmutable}> $flags */
+    private static function claim(
+        ?int $status,
+        ?string $time,
+        int $level = 1,
+        int $lastLevelClosed = 0,
+        bool $postedSince = false,
+        array $flags = [],
+    ): ClaimRecord {
+        return new ClaimRecord(7, 70, $status, $level, 'Payer', $time === null ? null : new \DateTimeImmutable($time), '99213__CO_16', $lastLevelClosed, $postedSince, $flags);
+    }
+
+    /**
+     * @param array{kind: string, priority: int, since: \DateTimeImmutable, flagged: bool}|null $decision
+     * @return array{string, int}|null
+     */
+    private static function kindAndPriority(?array $decision): ?array
+    {
+        return $decision === null ? null : [$decision['kind'], $decision['priority']];
+    }
+}

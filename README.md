@@ -2,7 +2,7 @@
 
 One queue of outstanding staff work across all patients, so nobody has to check four separate reports.
 
-**Status: 0.2.0, a pre-release.** Tested on OpenEMR with synthetic data only, access checks included (see [Compatibility](#compatibility)). It lists many patients' work on one page, so read [Access](#access) and [FOOTPRINT.md](FOOTPRINT.md) before installing, and try it with your own users and settings before giving staff access.
+**Status: 0.3.0, a pre-release.** Tested on OpenEMR with synthetic data only, access checks included (see [Compatibility](#compatibility)). It lists many patients' work on one page, so read [Access](#access) and [FOOTPRINT.md](FOOTPRINT.md) before installing, and try it with your own users and settings before giving staff access.
 
 | Tab | Listed when | Leaves the list when | Default owner |
 |---|---|---|---|
@@ -11,16 +11,17 @@ One queue of outstanding staff work across all patients, so nobody has to check 
 | Referral replies | An outgoing referral has no **Reply Date** after 14 days | Someone enters the reply date on the referral | Referring provider |
 | Care gaps, upcoming visits | A patient with a visit in the next 2 days has clinical reminders due | The visit passes or is cancelled, or the reminders are met | Visit provider |
 | Screening follow-up | A patient's latest PHQ-2, PHQ-9, GAD-7 or AUDIT-C total from the last 180 days is at or above the instrument's published cut-off | Something is coded after it: a later response, a problem or visit diagnosis for the condition, or a brief intervention for alcohol. See [Screening follow-up](#screening-follow-up) | Visit provider, else the patient's provider |
+| Claims follow-up | A claim was denied (OpenEMR records it and posts nothing), was billed to an insurer more than 45 days ago with nothing posted since, or has a line flagged for follow-up in payment posting. See [Claims follow-up](#claims-follow-up) | The claim is billed again or its insurance level is closed, something is posted at that level, or the flag is unticked | Nobody: billing staff take them from Unassigned |
 
 Work items are not stored. They're recomputed from OpenEMR data, and the worklist only reads them. Staff do the work in OpenEMR's own screens (the row button opens the right one), and the item disappears when that work is recorded.
 
 ## Priority
 
 - **Critical**: a result with a panic value (`vhigh` / `vlow`).
-- **High**: a result flagged abnormal, any result unsigned for more than 3 days, an overdue urgent order, an order overdue by twice its window, a referral that's high risk or more than 28 days old, and a screening total in the instrument's published severe band (PHQ-9 20 or more, GAD-7 15 or more).
+- **High**: a result flagged abnormal, any result unsigned for more than 3 days, an overdue urgent order, an order overdue by twice its window, a referral that's high risk or more than 28 days old, and a screening total in the instrument's published severe band (PHQ-9 20 or more, GAD-7 15 or more), a denied claim, and a claim with no payer response after 90 days.
 - **Normal**: everything else, including care gaps and other screening totals. Care gaps are visit prep, not an open safety loop.
 
-Within a priority, the oldest item comes first; care gaps sort by visit time. All thresholds are in `src/Policy/PriorityPolicy.php`.
+Within a priority, the oldest item comes first; care gaps sort by visit time. Thresholds are in `src/Policy/PriorityPolicy.php`; the screening cut-offs, from their papers, are in `src/Screening/ScreeningInstrument.php`.
 
 ## Staff actions
 
@@ -43,6 +44,7 @@ Each item belongs to a site (an OpenEMR facility):
 | Referrals | The referring provider's default facility, the same rule Reports › Referrals uses |
 | Care gaps | The appointment's facility |
 | Screening follow-up | The facility of the visit the questionnaire was filled in; none when it was filled outside a visit |
+| Claims follow-up | The visit's facility |
 
 Items with no determinable site are listed as **No site**. Inactive facilities are labeled *(inactive)* but still listed. An unsigned result at a closed site is still an open obligation, so the worklist never hides work because a site closed.
 
@@ -116,6 +118,23 @@ What it leaves out:
 - **Outside a visit:** a response filled in outside a visit has no sensitivity to apply.
 - **42 CFR Part 2:** a site with a Part 2 program should apply the restrictions described under [Sites](#who-can-see-which-sites) before staff at other sites use this tab.
 
+## Claims follow-up
+
+The tab lists claims that need billing staff, at most one row per visit:
+
+| Kind | Listed when | Priority |
+|---|---|---|
+| Denied | The visit's latest claim is a denial that OpenEMR's ERA posting recorded. When an 835 says a claim was denied, OpenEMR posts nothing, marks the claim denied, and says "follow up manually" | High |
+| No payer response | The latest claim was billed to an insurer more than 45 days ago, that insurance level isn't closed, and no payment or adjustment has been posted at that level since | Normal; High after 90 days |
+| Flagged for follow-up | Someone ticked **Follow Up** on a line in payment posting | Normal |
+
+- **What each row shows:** the payer and the service date, when the claim was billed or denied, the denial reason codes with their descriptions (from OpenEMR's own list), and the follow-up note.
+- **The button** opens OpenEMR's posting page for the visit.
+- **Window:** claims billed or denied in the last 365 days.
+- **Who sees it:** only users OpenEMR's Billing Manager admits (`acct/eob` or `acct/bill`, with write). The tab, its counts and its actions aren't there for anyone else.
+
+It doesn't yet list lines denied inside a claim that was otherwise paid. OpenEMR posts those as adjustments, and telling a denial from a contractual write-off needs a list of reason codes.
+
 ## Care gaps run in the background
 
 OpenEMR's rules engine takes about 150 ms per patient, which is too slow to run when the page loads. The background service **Staff Worklist care gaps** (Admin › Config › Background Services) runs every 10 minutes while someone is logged in or from cron, and caches the results. The schedule itself is read live, so a cancelled visit drops off immediately. The page shows when gaps were last checked, and **Check now** runs the job on demand.
@@ -141,6 +160,7 @@ Who sees what:
 - **The page** needs `patients/med` (the same as the menu entry). **Changing items** (assign, snooze, dismiss, reopen) needs `patients/med` write. The server checks both, not just the page.
 - **Sensitive visits:** see [Safety and privacy behaviour](#safety-and-privacy-behaviour).
 - **Sites:** with **Restrict Users to Facilities** on, see [Who can see which sites](#who-can-see-which-sites).
+- **Claims follow-up** is there only for users OpenEMR's Billing Manager admits (`acct/eob` or `acct/bill`, with write), the same check that page makes.
 
 How that has been checked, on 2026-10-10, on OpenEMR 8.4.1 and current master (8.5.0-dev), with synthetic data and test logins created and removed for the run:
 
@@ -169,7 +189,7 @@ On 8.1.0, 8.2.0, 8.3.0 and 8.4.0 (checked 2026-10-12 with `dev/module_compat_che
 
 **Install** means a fresh OpenEMR that installed itself, then `composer require` from this repository, then Register, Install and Enable in Modules › Manage Modules. Each step's effect was checked: where the files went, the three tables, the background service switching on (and off again when disabled), the menu entry and the permission it requires, the page rendering, and no PHP warnings from the module in Apache's logs.
 
-**Queues** means synthetic patients covering each queue, and the page and action endpoint driven as an administrator. Screening follow-up (0.2.0) is checked on 8.4.1 only, with `dev/worklist_screens_check.py` in the openhealthcare repository. That check covers each instrument at and under its cut-off, each thing that clears a row, the window, a deleted encounter form, and a PHQ-9 filled in OpenEMR's own Questionnaires page. Items appear with the right priority and site, actions work and are logged, signing a result or cancelling a visit clears its items, and the site picker narrows the list. **Access** means the five checks listed under [Access](#access).
+**Queues** means synthetic patients covering each queue, and the page and action endpoint driven as an administrator. Screening follow-up (0.2.0) is checked on 8.4.1 only, with `dev/worklist_screens_check.py` in the openhealthcare repository. That check covers each instrument at and under its cut-off, each thing that clears a row, the window, a deleted encounter form, and a PHQ-9 filled in OpenEMR's own Questionnaires page. Claims follow-up (0.3.0) is checked on 8.4.1 only, with `dev/worklist_claims_check.py`. That check posts a synthetic 835 through OpenEMR's own ERA posting (a denial and a payment), and covers claims billed 10, 60 and 100 days ago, a follow-up flag, and each one clearing. Items appear with the right priority and site, actions work and are logged, signing a result or cancelling a visit clears its items, and the site picker narrows the list. **Access** means the five checks listed under [Access](#access).
 
 ## Development
 
@@ -197,6 +217,7 @@ The unit tests need no database or OpenEMR install. CI runs them, and the footpr
 - Screening follow-up counts responses whatever their status, because OpenEMR's questionnaire runtime saves them all as `in-progress`.
 - Screening follow-up can't see follow-up written only in a note, or a referral made for it (a referral's reason is free text). Dismiss the item with a reason.
 - The PHQ-4 isn't read, because Clinic Forms' PHQ-4 has no total.
+- Claims follow-up doesn't list lines denied inside an otherwise paid claim, and shows how long ago a claim was denied rather than an appeal deadline, since those differ by payer.
 - At most 300 rows are shown at once, most urgent first.
 
 ## License

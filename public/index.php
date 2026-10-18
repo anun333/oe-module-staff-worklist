@@ -64,7 +64,9 @@ $sourceLabels = [
     ItemKey::SOURCE_REFERRAL => xl('Referral replies'),
     ItemKey::SOURCE_CAREGAP => xl('Care gaps, upcoming visits'),
     ItemKey::SOURCE_SCREEN => xl('Screening follow-up'),
+    ItemKey::SOURCE_CLAIM => xl('Claims follow-up'),
 ];
+$sourceLabels = array_filter($sourceLabels, static fn(string $source): bool => $service->hasSource($source), ARRAY_FILTER_USE_KEY);
 $viewLabels = [
     ItemState::STATUS_OPEN => xl('Open'),
     ItemState::STATUS_SNOOZED => xl('Snoozed'),
@@ -82,6 +84,7 @@ $ownerRoles = [
     ItemKey::SOURCE_REFERRAL => xl('Referring provider'),
     ItemKey::SOURCE_CAREGAP => xl('Visit provider'),
     ItemKey::SOURCE_SCREEN => xl('Visit or patient\'s provider'),
+    ItemKey::SOURCE_CLAIM => xl('Billing staff'),
 ];
 $priorityBadges = [
     WorkItem::PRIORITY_CRITICAL => ['badge-danger', xl('Critical')],
