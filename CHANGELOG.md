@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.1 (2026-10-19)
+
+- **Referral replies follows OpenEMR's transaction permission.** The tab, its counts and its rows are there only for users with `patients/trans`. From OpenEMR 8.5 (openemr/openemr#14627), the page that records a referral reply refuses anyone without it, so until now a user with `patients/med` and not `patients/trans` was shown work they couldn't open. On 8.4 that page checks nothing, so there the worklist is the stricter of the two. Every stock group with `patients/med` also holds `patients/trans`.
+- **The Record reply button** still works on 8.5's added check that a referral belongs to the open chart, because it opens the patient's chart before the referral. Checked in a browser on master.
+- **Tested:**
+  - `dev/smoke.py` has a sixth access check: no referral tab or rows for a `patients/med` user without `patients/trans`, and both for a Clinicians user. It passes on 8.4.1 and on master 1faefbbeb9, and fails on master with 0.4.0.
+  - On master, OpenEMR's transaction page refuses the first user (403) and opens the referral for the second.
+- **Fixed:** the README's status line still said 0.3.0.
+- No database change.
+
 ## 0.4.0 (2026-10-18)
 
 - **Screening totals are counted from the answers**, using each answer option's points in the questionnaire, rather than read from the total the form saved. Questionnaires that don't code their questions are read from the saved total, as before.

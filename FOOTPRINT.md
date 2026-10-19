@@ -89,6 +89,7 @@ As written in the source; whether they behave correctly for a given user is not 
 | `acct / eob (write)` | `src/Worklist/WorklistService.php` |
 | `patients / med (view)` | `public/index.php` |
 | `patients / med (write)` | `public/action.php`<br>`public/index.php` |
+| `patients / trans (view)` | `src/Worklist/WorklistService.php` |
 | `sensitivities / the item's level (view)` | `public/index.php`<br>`src/Worklist/WorklistService.php` |
 
 ## Audit log
@@ -109,7 +110,7 @@ As written in the source; whether they behave correctly for a given user is not 
 
 | part | files | lines |
 |---|---|---|
-| PHP logic (`src/`) | 37 | 3423 |
+| PHP logic (`src/`) | 37 | 3428 |
 | tests (`tests/`, `phpunit.xml.dist`) | 11 | 1274 |
 | pages (`public/`) | 4 | 833 |
 | tools (`tools/`) | 2 | 664 |

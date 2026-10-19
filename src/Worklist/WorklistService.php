@@ -73,10 +73,15 @@ final class WorklistService
         $sources = [
             new ResultsAwaitingReviewSource($policy, $now, OEGlobalsBag::getInstance()->getBoolean('portal_onsite_two_enable')),
             new OrdersMissingResultsSource($policy, $now),
-            new ReferralsAwaitingReplySource($policy, $now),
-            new CareGapsSource($policy, new UpcomingVisits($now), new CareGapCache()),
-            new ScreeningFollowUpSource($now),
         ];
+        // Referrals only for users core's transaction page admits: patients/trans, which
+        // add_transaction.php checks from 8.5 (#14627). On 8.4 nothing checks it, so here
+        // the worklist is the stricter of the two.
+        if (AclMain::aclCheckCore('patients', 'trans')) {
+            $sources[] = new ReferralsAwaitingReplySource($policy, $now);
+        }
+        $sources[] = new CareGapsSource($policy, new UpcomingVisits($now), new CareGapCache());
+        $sources[] = new ScreeningFollowUpSource($now);
         // Claims work only for users core's Billing Manager admits (interface/billing/billing_report.php).
         if (AclMain::aclCheckCore('acct', 'eob', '', 'write') || AclMain::aclCheckCore('acct', 'bill', '', 'write')) {
             $sources[] = new ClaimsFollowUpSource($policy, $now);
@@ -102,7 +107,7 @@ final class WorklistService
         return $this->assembler->assemble($items, $states, $filter, $today, $this->sites->accessFor($filter->userId));
     }
 
-    /** Whether this worklist includes a source (the claims source depends on the user). */
+    /** Whether this worklist includes a source (the claims and referrals sources depend on the user). */
     public function hasSource(string $source): bool
     {
         return isset($this->sources[$source]);

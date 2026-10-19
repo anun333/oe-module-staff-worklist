@@ -2,7 +2,7 @@
 
 One queue of outstanding staff work across all patients, so nobody has to check four separate reports.
 
-**Status: 0.3.0, a pre-release.** Tested on OpenEMR with synthetic data only, access checks included (see [Compatibility](#compatibility)). It lists many patients' work on one page, so read [Access](#access) and [FOOTPRINT.md](FOOTPRINT.md) before installing, and try it with your own users and settings before giving staff access.
+**Status: 0.4.1, a pre-release.** Tested on OpenEMR with synthetic data only, access checks included (see [Compatibility](#compatibility)). It lists many patients' work on one page, so read [Access](#access) and [FOOTPRINT.md](FOOTPRINT.md) before installing, and try it with your own users and settings before giving staff access.
 
 | Tab | Listed when | Leaves the list when | Default owner |
 |---|---|---|---|
@@ -171,18 +171,20 @@ Who sees what:
 - **Sensitive visits:** see [Safety and privacy behaviour](#safety-and-privacy-behaviour).
 - **Sites:** with **Restrict Users to Facilities** on, see [Who can see which sites](#who-can-see-which-sites).
 - **Claims follow-up** is there only for users OpenEMR's Billing Manager admits (`acct/eob` or `acct/bill`, with write), the same check that page makes.
+- **Referral replies** is there only for users with `patients/trans` (0.4.1), the check OpenEMR's transaction page makes from 8.5 (openemr/openemr#14627); without it, the page that records a reply refuses them. On 8.4.1 that page checks nothing, so there the worklist is the stricter of the two. Every stock group with `patients/med` also holds `patients/trans`.
 
 How that has been checked, on 2026-10-10, on OpenEMR 8.4.1 and current master (8.5.0-dev), with synthetic data and test logins created and removed for the run:
 
 - The rules are unit-tested (`tests/ComplianceRulesTest.php`, `tests/ActionRulesTest.php`): sensitivity masking, which actions masked items allow, site counts, snooze and dismiss limits.
-- End to end, against a running OpenEMR, the five checks below all passed:
+- End to end, against a running OpenEMR, the checks below all passed (the sixth since 0.4.1):
   1. A user without `patients/med` (Front Office) gets no menu entry, a 403 access-denied page at the worklist URL, and an action posted with a valid session token is refused by the permission check.
   2. A user with `patients/med` at view only sees the list, with no assign, snooze, dismiss or reopen controls and no action form; an action posted anyway is refused by the permission check.
   3. A user without the "High" sensitivity (Clinicians) sees a result from a High-sensitivity visit as "Restricted", without its test name, can't snooze it, can't assign it to someone who also lacks that level, and can assign it to someone who holds it.
   4. With Restrict Users to Facilities on, a facility-limited user sees only that facility's work plus work they were assigned, counts include only that work, work at other sites can't be acted on and isn't revealed, and work can't be assigned to someone restricted elsewhere.
   5. Each worklist view appears in Admin › Logs as `patient-record-select`, with the patients listed.
+  6. A user with `patients/med` and not `patients/trans` (the read-only test group) gets no Referral replies tab and no referral rows, while a Clinicians user still sees both. On master, OpenEMR's own transaction page refuses the first user (403) and opens the referral for the second; and as an administrator, a referral's Record reply button opens the patient's chart and then the referral, which OpenEMR's check that the referral belongs to the open chart accepts. Checked 2026-10-19 on 8.4.1 and master 1faefbbeb9; with 0.4.0 on master, this check fails.
 
-The same five are worth repeating in your own install, with your own groups and facilities, before giving staff access: your ACL setup isn't the stock one the checks used.
+The same six are worth repeating in your own install, with your own groups and facilities, before giving staff access: your ACL setup isn't the stock one the checks used.
 
 ## Compatibility
 
