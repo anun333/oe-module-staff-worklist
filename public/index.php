@@ -83,7 +83,7 @@ $ownerRoles = [
     ItemKey::SOURCE_ORDER => xl('Ordering provider'),
     ItemKey::SOURCE_REFERRAL => xl('Referring provider'),
     ItemKey::SOURCE_CAREGAP => xl('Visit provider'),
-    ItemKey::SOURCE_SCREEN => xl('Visit or patient\'s provider'),
+    ItemKey::SOURCE_SCREEN => xl('Visit or patient provider'),
     ItemKey::SOURCE_CLAIM => xl('Billing staff'),
 ];
 $priorityBadges = [

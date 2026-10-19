@@ -2,7 +2,11 @@
 
 /**
  * Stable identifier for a work item: "<source>:<pid>:<ref>", where ref is the
- * id of the underlying record (order, transaction or appointment).
+ * id of the underlying record (order, transaction or appointment). A screening
+ * item's ref may end in one digit after a dot, telling apart the items one
+ * questionnaire response can give: "12" for a total at the cut-off, "12.2" for an
+ * unfinished PHQ-9 (the digit is the instrument's), so dismissing an unfinished screen
+ * never hides the result it later becomes.
  *
  * The pid is part of the key so an action request can be re-checked against
  * the source for that one patient instead of trusting what the browser sent.
@@ -24,24 +28,31 @@ final class ItemKey
     public const SOURCE_SCREEN = 'screen';
     public const SOURCE_CLAIM = 'claim';
 
-    private const PATTERN = '/^(result|order|referral|caregap|screen|claim):([1-9]\d{0,17}):([1-9]\d{0,17})$/D';
+    private const PATTERN = '/^(result|order|referral|caregap|screen|claim):([1-9]\d{0,17}):([1-9]\d{0,17}(?:\.[1-9])?)$/D';
 
     public function __construct(
         public readonly string $source,
         public readonly int $pid,
         public readonly string $ref,
     ) {
-        if (!preg_match(self::PATTERN, "$source:$pid:$ref")) {
+        if (!self::valid("$source:$pid:$ref")) {
             throw new \InvalidArgumentException('Invalid work item key');
         }
     }
 
     public static function parse(string $key): ?self
     {
-        if (!preg_match(self::PATTERN, $key, $m)) {
+        if (!self::valid($key) || !preg_match(self::PATTERN, $key, $m)) {
             return null;
         }
         return new self($m[1], (int)$m[2], $m[3]);
+    }
+
+    /** The pattern, and the dotted ref only on a screening item. */
+    private static function valid(string $key): bool
+    {
+        return preg_match(self::PATTERN, $key, $m) === 1
+            && (!str_contains($m[3], '.') || $m[1] === self::SOURCE_SCREEN);
     }
 
     public function __toString(): string

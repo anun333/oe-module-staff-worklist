@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0 (2026-10-18)
+
+- **Screening totals are counted from the answers**, using each answer option's points in the questionnaire, rather than read from the total the form saved. Questionnaires that don't code their questions are read from the saved total, as before.
+- **Unfinished screens.** A skipped question can only add points, so:
+  - **at or above the cut-off on the answers given:** listed as before, saying how many were answered;
+  - **below it even with every skipped question at its highest:** not listed;
+  - **anything between:** a new Normal-priority row, for example "PHQ-9 not finished: 6 of 9 questions answered, 5 points so far", with the most it could reach. It's cleared by what clears a finished screen, or by dismissing it with a reason.
+  - **Nothing answered:** not a screen. Until now, the 0 that OpenEMR's runtime saves for an empty PHQ-9 read as a total under the cut-off.
+- **Keys.** An unfinished row has its own key (`screen:<pid>:<response>.<digit>`), so dismissing it doesn't hide the result if the same response is finished later.
+- **LOINC's own imported PHQ-9** is now read. Its total item is uncoded, so the instrument is recognized by its panel code.
+- **Fixed:** the PHQ-2's cut-off wording and the tab's owner column showed a backtick for an apostrophe, because OpenEMR's `xl()` turns quotes into backticks.
+- **Unchanged on purpose:** PHQ-9 item 9 isn't listed on its own (see the README); it counts toward the total like any other question.
+- **Tested:**
+  - **Isolated tests:** the range on each side of the cut-off, an empty form, answer points read from the options, from the answer's own extension or from `itemWeight`, out-of-range answers, nested answers, LOINC's shape, and a PHQ-9 not being read as a PHQ-2. Seven deliberate breaks each fail them.
+  - **On OpenEMR 8.4.1 and master 1faefbbeb9** with `dev/worklist_screens_check.py`: seven full PHQ-9s with questions skipped, and an unfinished row dismissed and then finished in place, as well as every 0.2.0 case.
+- No database change.
+
 ## 0.3.0 (2026-10-18)
 
 - **New tab: Claims follow-up**, for billing staff. At most one row per visit:

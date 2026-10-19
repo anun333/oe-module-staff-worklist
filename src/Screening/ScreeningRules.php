@@ -5,8 +5,12 @@
  * the latest response in the window counts. It is listed when its total is at or above
  * the published cut-off and nothing that shows it was acted on stands on or after its
  * day: the longer instrument that follows it, or a problem, visit diagnosis or service
- * with one of the instrument's codes. The rules never call a screen positive; they
- * compare the recorded total with the paper's cut-off, and the clinician decides.
+ * with one of the instrument's codes.
+ *
+ * With questions unanswered, the total is counted from the answers alone: at or above the
+ * cut-off is listed as before, a total that couldn't reach it even at full marks isn't,
+ * and anything between is listed as unfinished. The rules never call a screen positive;
+ * they compare the answers with the paper's cut-off, and the clinician decides.
  *
  * @package   OpenEMR
  * @link      https://www.open-emr.org
@@ -58,7 +62,7 @@ final class ScreeningRules
             if ($response->date < $start) {
                 continue;
             }
-            foreach ($response->totals as $code => $_) {
+            foreach ($response->scores as $code => $_) {
                 if (!isset($this->instruments[$code])) {
                     continue;
                 }
@@ -77,18 +81,27 @@ final class ScreeningRules
         foreach ($latest as $pid => $byCode) {
             foreach ($byCode as $code => $response) {
                 $instrument = $this->instruments[$code];
-                $score = $response->totals[$code];
+                $score = $response->scores[$code];
                 [$cutoff, $sexUnknown] = $instrument->cutoffFor($sexByPid[$pid] ?? null);
-                if ($score < $cutoff || $this->followedUp($instrument, $response, $byCode, $recordsByPid[$pid] ?? [])) {
+                // Unanswered questions can only add points: at or above the cut-off on what
+                // was answered stays there, and below it even at full marks stays below.
+                $kind = match (true) {
+                    $score->low >= $cutoff => ScreenFinding::AT_CUTOFF,
+                    $score->high >= $cutoff => ScreenFinding::UNFINISHED,
+                    default => null,
+                };
+                if ($kind === null || $this->followedUp($instrument, $response, $byCode, $recordsByPid[$pid] ?? [])) {
                     continue;
                 }
                 $findings[] = new ScreenFinding(
                     $response,
                     $instrument,
-                    $score,
+                    $score->low,
                     $cutoff,
                     $sexUnknown,
-                    $instrument->severeAt !== null && $score >= $instrument->severeAt,
+                    $kind === ScreenFinding::AT_CUTOFF && $instrument->severeAt !== null && $score->low >= $instrument->severeAt,
+                    $kind,
+                    $score,
                 );
             }
         }

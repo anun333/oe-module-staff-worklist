@@ -109,8 +109,8 @@ As written in the source; whether they behave correctly for a given user is not 
 
 | part | files | lines |
 |---|---|---|
-| PHP logic (`src/`) | 35 | 3077 |
-| tests (`tests/`, `phpunit.xml.dist`) | 10 | 970 |
+| PHP logic (`src/`) | 37 | 3423 |
+| tests (`tests/`, `phpunit.xml.dist`) | 11 | 1274 |
 | pages (`public/`) | 4 | 833 |
 | tools (`tools/`) | 2 | 664 |
 | module wiring | 5 | 145 |

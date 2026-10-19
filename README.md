@@ -10,7 +10,7 @@ One queue of outstanding staff work across all patients, so nobody has to check 
 | No result yet | An order has no final result after 7 days (1 day for stat, ASAP, urgent or high) | A result arrives, or the order is completed or cancelled | Ordering provider |
 | Referral replies | An outgoing referral has no **Reply Date** after 14 days | Someone enters the reply date on the referral | Referring provider |
 | Care gaps, upcoming visits | A patient with a visit in the next 2 days has clinical reminders due | The visit passes or is cancelled, or the reminders are met | Visit provider |
-| Screening follow-up | A patient's latest PHQ-2, PHQ-9, GAD-7 or AUDIT-C total from the last 180 days is at or above the instrument's published cut-off | Something is coded after it: a later response, a problem or visit diagnosis for the condition, or a brief intervention for alcohol. See [Screening follow-up](#screening-follow-up) | Visit provider, else the patient's provider |
+| Screening follow-up | A patient's latest PHQ-2, PHQ-9, GAD-7 or AUDIT-C from the last 180 days is at or above the instrument's published cut-off, or is unfinished and could still reach it | Something is coded after it: a later response, a problem or visit diagnosis for the condition, or a brief intervention for alcohol. See [Screening follow-up](#screening-follow-up) | Visit provider, else the patient's provider |
 | Claims follow-up | A claim was denied (OpenEMR records it and posts nothing), was billed to an insurer more than 45 days ago with nothing posted since, or has a line flagged for follow-up in payment posting. See [Claims follow-up](#claims-follow-up) | The claim is billed again or its insurance level is closed, something is posted at that level, or the flag is unticked | Nobody: billing staff take them from Unassigned |
 
 Work items are not stored. They're recomputed from OpenEMR data, and the worklist only reads them. Staff do the work in OpenEMR's own screens (the row button opens the right one), and the item disappears when that work is recorded.
@@ -19,7 +19,7 @@ Work items are not stored. They're recomputed from OpenEMR data, and the worklis
 
 - **Critical**: a result with a panic value (`vhigh` / `vlow`).
 - **High**: a result flagged abnormal, any result unsigned for more than 3 days, an overdue urgent order, an order overdue by twice its window, a referral that's high risk or more than 28 days old, and a screening total in the instrument's published severe band (PHQ-9 20 or more, GAD-7 15 or more), a denied claim, and a claim with no payer response after 90 days.
-- **Normal**: everything else, including care gaps and other screening totals. Care gaps are visit prep, not an open safety loop.
+- **Normal**: everything else, including care gaps, other screening totals and unfinished screens. Care gaps are visit prep, not an open safety loop.
 
 Within a priority, the oldest item comes first; care gaps sort by visit time. Thresholds are in `src/Policy/PriorityPolicy.php`; the screening cut-offs, from their papers, are in `src/Screening/ScreeningInstrument.php`.
 
@@ -82,6 +82,16 @@ To size the worklist for a real clinic, run the read-only `tools/profile-counts.
 
 The tab reads the questionnaire responses OpenEMR's own runtime saves, from the encounter form (New Questionnaire) and the patient's Questionnaires page. It lists a patient's latest response to an instrument when its total is at or above the cut-off the instrument's validation paper gives, and nothing is coded after it.
 
+**The total is counted from the answers** (0.4.0), not read from the total the form saved. Each answer's points come from the questionnaire's own answer options, and the questions are found by their LOINC codes. When a questionnaire doesn't code its questions, the saved total is read instead, as before.
+
+**Unfinished screens.** Patients skip questions, and nothing is filled in for one. A skipped question can only add points, so the answers given decide most cases:
+- **At or above the cut-off** on the answers alone: listed as usual. The row says how many questions were answered.
+- **Below the cut-off even if every skipped question had its highest answer:** not listed.
+- **Anything between:** listed as unfinished, for example "PHQ-9 not finished: 6 of 9 questions answered, 5 points so far", with the most the total could reach. Finish the screen or dismiss the row with a reason. Dismissing an unfinished row doesn't hide the result if the same response is finished later.
+- **Nothing answered:** not a screen, so not listed. OpenEMR's runtime saves a total of 0 for an empty form; that 0 isn't read.
+
+This needs no rule for missing answers. The PHQ instruction manual gives none (checked 2026-10-18), and filling in or rescaling missing answers is a research convention that varies by instrument.
+
 | Instrument | Total read (LOINC) | Listed at | Source | Also cleared by, on or after the screen's day |
 |---|---|---|---|---|
 | PHQ-2 | 55758-7 | 3 or more | Kroenke 2003, PMID 14583691 | a PHQ-9 response, or what clears a PHQ-9 |
@@ -92,14 +102,14 @@ The tab reads the questionnaire responses OpenEMR's own runtime saves, from the 
 - **A later response** to the same instrument always replaces an earlier one, so a re-screen under the cut-off clears it.
 - **A problem already on the list** for the condition clears it too: the clinician already knows.
 - **Follow-up recorded only in a note** can't be seen. Dismiss the item with a reason, such as "addressed in the visit note".
-- **Each row shows its basis:** the score, the cut-off and what the paper says it means, the paper, and the date and who recorded it. It also says when a fact was missing; for example, when a patient's sex isn't recorded as male or female, AUDIT-C uses the women's cut-off and the row says so.
+- **Each row shows its basis:** the score, the cut-off and what the paper says it means, the paper, and the date and who recorded it. It also says when a fact was missing; for example, when a patient's sex isn't recorded as male or female, AUDIT-C uses the women's cut-off and the row says so, and an unfinished screen says how many questions were answered.
 - **It never calls a screen positive or suggests a diagnosis or treatment.** Whether a screen is positive under the clinic's protocol, and what to do, is the clinician's decision.
-- **The cut-offs** are the ones checked in [Clinic Forms](https://github.com/anun333/oe-module-clinic-forms)' instrument references, against each paper.
+- **The cut-offs, questions and points** are the ones checked in [Clinic Forms](https://github.com/anun333/oe-module-clinic-forms)' instrument references, against each paper and LOINC.
 
 What it leaves out:
 
-- **Suicide risk.** PHQ-9 item 9 and the ASQ aren't read. A positive answer needs action at the same visit under the clinic's protocol, and a worklist that people look at days later is the wrong tool for that.
-- **Totals that no item is coded for.** LOINC's own imported PHQ-9 leaves its total item uncoded, so those responses aren't read. Clinic Forms' questionnaires (0.25.0 and later) code it.
+- **Suicide risk.** PHQ-9 item 9 and the ASQ aren't read on their own. A positive answer needs action at the same visit under the clinic's protocol, and a worklist that people look at days later is the wrong tool for that. Item 9 counts toward the PHQ-9 total like any other question, and a skipped item 9 counts as unanswered. Clinic Forms' printed PHQ-9 tells staff to ask about it the same day when it's answered above "Not at all" or left blank.
+- **Questionnaires that code neither the total nor the panel.** A questionnaire is read as an instrument when it carries the instrument's LOINC total code or panel code (PHQ-9 44249-1, PHQ-2 55757-9, GAD-7 69737-5, AUDIT-C 72109-2). LOINC's own imported PHQ-9, whose total item is uncoded, is now read through its panel code (0.4.0).
 - **Responses whose encounter form was deleted.** OpenEMR keeps the response row when the form is deleted; the tab doesn't read it.
 - **Responses from patients now deceased.**
 
@@ -189,7 +199,7 @@ On 8.1.0, 8.2.0, 8.3.0 and 8.4.0 (checked 2026-10-12 with `dev/module_compat_che
 
 **Install** means a fresh OpenEMR that installed itself, then `composer require` from this repository, then Register, Install and Enable in Modules › Manage Modules. Each step's effect was checked: where the files went, the three tables, the background service switching on (and off again when disabled), the menu entry and the permission it requires, the page rendering, and no PHP warnings from the module in Apache's logs.
 
-**Queues** means synthetic patients covering each queue, and the page and action endpoint driven as an administrator. Screening follow-up (0.2.0) is checked on 8.4.1 and on master 1faefbbeb9 (2026-10-18), with `dev/worklist_screens_check.py` in the openhealthcare repository. That check covers each instrument at and under its cut-off, each thing that clears a row, the window, a deleted encounter form, and a PHQ-9 filled in OpenEMR's own Questionnaires page. Claims follow-up (0.3.0) is checked on 8.4.1 and on master 1faefbbeb9, with `dev/worklist_claims_check.py`. That check posts a synthetic 835 through OpenEMR's own ERA posting (a denial and a payment), and covers claims billed 10, 60 and 100 days ago, a follow-up flag, and each one clearing. Items appear with the right priority and site, actions work and are logged, signing a result or cancelling a visit clears its items, and the site picker narrows the list. **Access** means the five checks listed under [Access](#access).
+**Queues** means synthetic patients covering each queue, and the page and action endpoint driven as an administrator. Screening follow-up (0.4.0) is checked on 8.4.1 and on master 1faefbbeb9 (2026-10-18), with `dev/worklist_screens_check.py` in the openhealthcare repository. That check covers each instrument at and under its cut-off, each thing that clears a row, the window, a deleted encounter form, and a PHQ-9 filled in OpenEMR's own Questionnaires page. Since 0.4.0 it also covers full PHQ-9s with questions skipped: unfinished, already at the cut-off, unable to reach it, empty, question 9 alone, LOINC's own shape, and an unfinished row dismissed and then finished in place. Claims follow-up (0.3.0) is checked on 8.4.1 and on master 1faefbbeb9, with `dev/worklist_claims_check.py`. That check posts a synthetic 835 through OpenEMR's own ERA posting (a denial and a payment), and covers claims billed 10, 60 and 100 days ago, a follow-up flag, and each one clearing. Items appear with the right priority and site, actions work and are logged, signing a result or cancelling a visit clears its items, and the site picker narrows the list. **Access** means the five checks listed under [Access](#access).
 
 ## Development
 

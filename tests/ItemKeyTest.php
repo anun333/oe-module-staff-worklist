@@ -29,6 +29,22 @@ final class ItemKeyTest extends TestCase
         self::assertSame('9001', $key->ref);
     }
 
+    public function testAScreeningRefMayEndInOneDigitTellingApartTheItemsOfOneResponse(): void
+    {
+        foreach (['screen:3:12', 'screen:3:12.2', 'screen:3:12.9'] as $raw) {
+            $key = ItemKey::parse($raw);
+            self::assertNotNull($key, $raw);
+            self::assertSame($raw, (string)$key);
+        }
+        self::assertNotSame((string)ItemKey::parse('screen:3:12.2'), (string)ItemKey::parse('screen:3:122'));
+    }
+
+    public function testConstructorRejectsADottedRefOutsideScreening(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new ItemKey('order', 1, '2.3');
+    }
+
     /** @return array<string, array{string}> */
     public static function invalidKeys(): array
     {
@@ -44,6 +60,11 @@ final class ItemKeyTest extends TestCase
             'extra segment' => ['caregap:1:2:3'],
             'pid overflow' => ['order:99999999999999999999:1'],
             'trailing newline' => ["order:1:2\n"],
+            'dotted ref outside screening' => ['order:1:2.3'],
+            'zero after the dot' => ['screen:1:12.0'],
+            'two digits after the dot' => ['screen:1:12.10'],
+            'dot with nothing after' => ['screen:1:12.'],
+            'two dots' => ['screen:1:12.2.9'],
         ];
     }
 

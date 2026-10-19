@@ -17,14 +17,14 @@ namespace OpenHealthcare\StaffWorklist\Screening;
 final class ScreenResponse
 {
     /**
-     * @param int                  $id     questionnaire_response.id
-     * @param array<string, float> $totals total code => score (ResponseTotals::read)
+     * @param int                            $id     questionnaire_response.id
+     * @param array<string, InstrumentScore> $scores total code => score (ResponseScoring::read)
      */
     public function __construct(
         public readonly int $id,
         public readonly int $pid,
         public readonly \DateTimeImmutable $date,
-        public readonly array $totals,
+        public readonly array $scores,
     ) {
     }
 }

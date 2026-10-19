@@ -16,9 +16,17 @@ namespace OpenHealthcare\StaffWorklist\Screening;
 
 final class ScreenFinding
 {
+    /** The total, counting only the questions answered, is at or above the cut-off. */
+    public const AT_CUTOFF = 'at-cutoff';
+
+    /** Questions are unanswered, and the total could end up either side of the cut-off. */
+    public const UNFINISHED = 'unfinished';
+
     /**
-     * @param bool $sexUnknown the women's cut-off was used because the patient's sex isn't recorded as male or female
-     * @param bool $severe     the total is in the paper's severe band
+     * @param string $kind       one of the constants above
+     * @param float  $score      the points of the questions answered
+     * @param bool   $sexUnknown the women's cut-off was used because the patient's sex isn't recorded as male or female
+     * @param bool   $severe     the total is in the paper's severe band
      */
     public function __construct(
         public readonly ScreenResponse $response,
@@ -27,6 +35,8 @@ final class ScreenFinding
         public readonly int $cutoff,
         public readonly bool $sexUnknown,
         public readonly bool $severe,
+        public readonly string $kind = self::AT_CUTOFF,
+        public readonly ?InstrumentScore $detail = null,
     ) {
     }
 }

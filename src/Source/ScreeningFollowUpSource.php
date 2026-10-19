@@ -22,7 +22,7 @@ use OpenHealthcare\StaffWorklist\Model\ItemKey;
 use OpenHealthcare\StaffWorklist\Model\PatientRef;
 use OpenHealthcare\StaffWorklist\Model\WorkItem;
 use OpenHealthcare\StaffWorklist\Screening\FollowUpRecord;
-use OpenHealthcare\StaffWorklist\Screening\ResponseTotals;
+use OpenHealthcare\StaffWorklist\Screening\ResponseScoring;
 use OpenHealthcare\StaffWorklist\Screening\ScreenFinding;
 use OpenHealthcare\StaffWorklist\Screening\ScreeningInstrument;
 use OpenHealthcare\StaffWorklist\Screening\ScreeningRules;
@@ -45,12 +45,16 @@ final class ScreeningFollowUpSource implements WorkSourceInterface
 
     public function collect(?int $pid = null): array
     {
-        $codes = array_keys(ScreeningInstrument::all());
+        $instruments = ScreeningInstrument::all();
         $binds = [$this->rules->windowStart()->format('Y-m-d H:i:s')];
         $mentions = [];
-        foreach ($codes as $code) {
-            $mentions[] = 'COALESCE(NULLIF(qr.questionnaire, \'\'), rep.questionnaire) LIKE ?';
-            $binds[] = '%"' . $code . '"%';
+        // A Questionnaire carries an instrument through its total code or, as LOINC's own
+        // PHQ-9 does with its total uncoded, its panel code.
+        foreach ($instruments as $instrument) {
+            foreach (array_filter([$instrument->totalCode, $instrument->panelCode]) as $code) {
+                $mentions[] = 'COALESCE(NULLIF(qr.questionnaire, \'\'), rep.questionnaire) LIKE ?';
+                $binds[] = '%"' . $code . '"%';
+            }
         }
         $patientFilter = '';
         if ($pid !== null) {
@@ -83,13 +87,13 @@ final class ScreeningFollowUpSource implements WorkSourceInterface
         $sexByPid = [];
         foreach (QueryUtils::fetchRecords($sql, $binds) as $row) {
             $date = self::date($row['create_time'] ?? null);
-            $totals = ResponseTotals::read((string)($row['questionnaire_json'] ?? ''), (string)($row['response_json'] ?? ''), $codes);
+            $scores = ResponseScoring::read((string)($row['questionnaire_json'] ?? ''), (string)($row['response_json'] ?? ''), $instruments);
             $patient = PatientRef::fromRow((int)$row['patient_id'], $row, $this->now);
-            if ($date === null || $totals === [] || $patient->deceased) {
+            if ($date === null || $scores === [] || $patient->deceased) {
                 continue;
             }
             $id = (int)$row['id'];
-            $responses[] = new ScreenResponse($id, $patient->pid, $date, $totals);
+            $responses[] = new ScreenResponse($id, $patient->pid, $date, $scores);
             $rows[$id] = $row;
             $sexByPid[$patient->pid] = is_string($row['sex'] ?? null) ? $row['sex'] : null;
         }
@@ -146,25 +150,43 @@ final class ScreeningFollowUpSource implements WorkSourceInterface
     private function toItem(ScreenFinding $finding, array $row): WorkItem
     {
         $instrument = $finding->instrument;
-        $score = rtrim(rtrim(number_format($finding->score, 2, '.', ''), '0'), '.');
-        $facts = [
-            xl('Screened') . ' ' . oeFormatShortDate($finding->response->date->format('Y-m-d')),
-            xl('Cut-off') . ' ' . $finding->cutoff . ': ' . xl($instrument->meaning),
-        ];
+        $detail = $finding->detail;
+        $score = self::number($finding->score);
+        $facts = [xl('Screened') . ' ' . oeFormatShortDate($finding->response->date->format('Y-m-d'))];
         $by = trim(($row['by_fname'] ?? '') . ' ' . ($row['by_lname'] ?? ''));
         if ($by !== '') {
             $facts[0] .= ' ' . xl('by') . ' ' . $by;
         }
+        $answered = $detail !== null && !$detail->isFinished()
+            ? sprintf(xl('%1$d of %2$d questions answered'), $detail->answered, $detail->questions)
+            : null;
+        $ref = (string)$finding->response->id;
+
+        if ($finding->kind === ScreenFinding::UNFINISHED) {
+            $title = sprintf(xl('%1$s not finished: %2$s, %3$s points so far'), $instrument->name, (string)$answered, $score);
+            $facts[] = sprintf(xl('Could still reach the cut-off of %1$d (up to %2$s with every question answered)'), $finding->cutoff, self::number((float)$detail?->high));
+            $facts[] = xl('Cut-off') . ' ' . $finding->cutoff . ': ' . xl($instrument->meaning);
+            $facts[] = xl('Source') . ': ' . $instrument->source;
+            $ref .= '.' . $instrument->keyDigit;
+        } else {
+            $title = $answered === null
+                ? $instrument->name . ' ' . xl('total') . ' ' . $score . ', ' . xl('at or above its published cut-off')
+                : sprintf(xl('%1$s total at least %2$s (%3$s), at or above its published cut-off'), $instrument->name, $score, $answered);
+            $facts[] = xl('Cut-off') . ' ' . $finding->cutoff . ': ' . xl($instrument->meaning);
+            if ($answered !== null) {
+                $facts[] = xl('Unanswered questions can only add points');
+            }
+            $facts[] = xl('Source') . ': ' . $instrument->source;
+        }
         if ($finding->sexUnknown) {
             $facts[] = xl('Sex not recorded as male or female, so the cut-off for women was used');
         }
-        $facts[] = xl('Source') . ': ' . $instrument->source;
         $owner = ((int)($row['visit_provider'] ?? 0)) ?: ((int)($row['patient_provider'] ?? 0));
 
         return new WorkItem(
-            key: new ItemKey(ItemKey::SOURCE_SCREEN, $finding->response->pid, (string)$finding->response->id),
+            key: new ItemKey(ItemKey::SOURCE_SCREEN, $finding->response->pid, $ref),
             patient: PatientRef::fromRow($finding->response->pid, $row, $this->now),
-            title: $instrument->name . ' ' . xl('total') . ' ' . $score . ', ' . xl('at or above its published cut-off'),
+            title: $title,
             detail: implode(' · ', $facts),
             priority: $finding->severe ? WorkItem::PRIORITY_HIGH : WorkItem::PRIORITY_NORMAL,
             since: $finding->response->date,
@@ -176,6 +198,11 @@ final class ScreeningFollowUpSource implements WorkSourceInterface
             siteId: ((int)($row['site_id'] ?? 0)) ?: null,
             sensitivity: is_string($row['sensitivity'] ?? null) ? $row['sensitivity'] : null,
         );
+    }
+
+    private static function number(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
     }
 
     private static function date(mixed $value): ?\DateTimeImmutable

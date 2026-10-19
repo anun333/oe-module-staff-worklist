@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OpenHealthcare\StaffWorklist\Tests;
 
 use OpenHealthcare\StaffWorklist\Screening\FollowUpRecord;
+use OpenHealthcare\StaffWorklist\Screening\InstrumentScore;
 use OpenHealthcare\StaffWorklist\Screening\ResponseTotals;
 use OpenHealthcare\StaffWorklist\Screening\ScreenFinding;
 use OpenHealthcare\StaffWorklist\Screening\ScreeningInstrument;
@@ -183,6 +184,68 @@ final class ScreeningRulesTest extends TestCase
         $this->assertSame([], ResponseTotals::read('not json', (string)$response, [ScreeningInstrument::PHQ9]));
     }
 
+    /** @return iterable<string, array{InstrumentScore, string|null}> */
+    public static function unfinished(): iterable
+    {
+        // PHQ-9, cut-off 10, nine questions of 0 to 3.
+        yield 'at the cut-off on what was answered' => [new InstrumentScore(10, 16, 7, 9), ScreenFinding::AT_CUTOFF];
+        yield 'could still reach it' => [new InstrumentScore(4, 13, 6, 9), ScreenFinding::UNFINISHED];
+        yield 'reaches it exactly at full marks' => [new InstrumentScore(4, 10, 7, 9), ScreenFinding::UNFINISHED];
+        yield 'couldn\'t reach it at full marks' => [new InstrumentScore(3, 9, 7, 9), null];
+        yield 'finished under it' => [new InstrumentScore(9, 9, 9, 9), null];
+    }
+
+    #[DataProvider('unfinished')]
+    public function testUnansweredQuestionsCanOnlyAddPoints(InstrumentScore $score, ?string $kind): void
+    {
+        $found = $this->rules()->findings([self::response(1, 7, '2026-10-01', [ScreeningInstrument::PHQ9 => $score])], [], []);
+
+        $this->assertSame($kind === null ? [] : [$kind], array_map(static fn(ScreenFinding $f): string => $f->kind, $found));
+        if ($kind !== null) {
+            $this->assertSame($score->low, $found[0]->score, 'the total shown counts only what was answered');
+            $this->assertFalse($found[0]->severe);
+        }
+    }
+
+    public function testTheSevereBandNeedsTheAnsweredQuestionsToReachIt(): void
+    {
+        $responses = [
+            self::response(1, 1, '2026-10-01', [ScreeningInstrument::PHQ9 => new InstrumentScore(20, 22, 8, 9)]),
+            self::response(2, 2, '2026-10-01', [ScreeningInstrument::PHQ9 => new InstrumentScore(18, 21, 8, 9)]),
+        ];
+
+        $found = $this->rules()->findings($responses, [], []);
+
+        $this->assertSame([1 => true, 2 => false], self::byPid($found, static fn(ScreenFinding $f): bool => $f->severe));
+    }
+
+    public function testAnUnfinishedScreenIsClearedByWhatClearsAFinishedOne(): void
+    {
+        $responses = [
+            self::response(1, 1, '2026-10-01', [ScreeningInstrument::PHQ9 => new InstrumentScore(5, 14, 6, 9)]),
+            self::response(2, 2, '2026-10-01', [ScreeningInstrument::PHQ9 => new InstrumentScore(5, 14, 6, 9)]),
+        ];
+
+        $found = $this->rules()->findings($responses, [], [new FollowUpRecord(1, 'ICD10', 'F32.9', null)]);
+
+        $this->assertSame([2 => ScreenFinding::UNFINISHED], self::byPid($found, static fn(ScreenFinding $f): string => $f->kind));
+    }
+
+    public function testEachInstrumentHasItsQuestionsPanelCodeAndOwnKeyDigit(): void
+    {
+        $digits = [];
+        foreach (ScreeningInstrument::all() as $instrument) {
+            $this->assertNotSame([], $instrument->questions, $instrument->name);
+            $this->assertMatchesRegularExpression('/^\d{4,5}-\d$/', $instrument->panelCode, $instrument->name);
+            $digits[] = $instrument->keyDigit;
+        }
+        $this->assertSame([1, 2, 3, 4], $digits);
+        $this->assertSame(27, array_sum(ScreeningInstrument::all()[ScreeningInstrument::PHQ9]->questions));
+        $this->assertSame(21, array_sum(ScreeningInstrument::all()[ScreeningInstrument::GAD7]->questions));
+        $this->assertSame(12, array_sum(ScreeningInstrument::all()[ScreeningInstrument::AUDITC]->questions));
+        $this->assertSame(6, array_sum(ScreeningInstrument::all()[ScreeningInstrument::PHQ2]->questions));
+    }
+
     public function testEveryInstrumentNamesItsSourceAndAPubmedId(): void
     {
         foreach (ScreeningInstrument::all() as $code => $instrument) {
@@ -198,10 +261,11 @@ final class ScreeningRulesTest extends TestCase
         return new ScreeningRules(new \DateTimeImmutable(self::NOW));
     }
 
-    /** @param array<string, float> $totals */
+    /** @param array<string, float|InstrumentScore> $totals a float is a saved total */
     private static function response(int $id, int $pid, string $date, array $totals): ScreenResponse
     {
-        return new ScreenResponse($id, $pid, new \DateTimeImmutable($date), $totals);
+        $scores = array_map(static fn(float|InstrumentScore $t): InstrumentScore => $t instanceof InstrumentScore ? $t : InstrumentScore::saved($t), $totals);
+        return new ScreenResponse($id, $pid, new \DateTimeImmutable($date), $scores);
     }
 
     /**
