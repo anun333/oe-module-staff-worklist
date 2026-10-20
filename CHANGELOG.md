@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.0 (2026-10-19)
+
+- **Claims follow-up: lines written off with a denial reason.** A remittance that adjusted a line off ("Adjust code NN"), paid nothing for it, and gave a reason other than the contractual 45 or 59 is listed, High.
+  - That's how OpenEMR before 8.4.1 posted a line denial inside a paid claim: as a write-off. Since openemr/openemr#11868 (in 8.4.1) it refuses to post one.
+  - The row names the line, the reason with OpenEMR's description, the amount and when it was written off. It stays until dismissed, since closing the level doesn't undo the write-off.
+- **Claims follow-up: a remittance that left the insurance open.** A claim with a payment or adjustment posted at its level more than 30 days ago, and the level still open, is listed. Normal.
+  - Since 8.4.1, a line OpenEMR won't post (paid nothing, with a reason other than 45 or 59) stops the rest of that claim's posting and leaves the level open. Before this, the tab dropped such a claim as soon as anything posted.
+- **A Sliding fee re-assessments tab**, when the [Sliding Fee Discount](https://github.com/anun333/oe-module-sliding-fee) module is installed and enabled.
+  - It lists patients seen in the last 12 months whose assessment runs out within 30 days, has run out, or who were never assessed, by the main schedule's re-assessment period.
+  - The button opens that module's assessment page. It needs `patients/demo`, as that module's own list does.
+- `version.php` and `info.txt` say 0.5.0. They had said 0.3.0 and 0.1.0.
+- **Tested:**
+  - unit tests for each new kind and the memo parsing, and for the re-assessment rule and period;
+  - on OpenEMR 8.4.1, a synthetic 835 with a paid line and a CO-50 line paid nothing: core posted the first, refused the second and left the level open, and the claim is listed once its posting is 40 days old;
+  - an "Adjust code 50" write-off listed, High, and kept after the level closed;
+  - the re-assessments tab against synthetic schedules and assessments, including a service schedule's period being ignored.
+
 ## 0.4.1 (2026-10-19)
 
 - **Referral replies follows OpenEMR's transaction permission.** The tab, its counts and its rows are there only for users with `patients/trans`. From OpenEMR 8.5 (openemr/openemr#14627), the page that records a referral reply refuses anyone without it, so until now a user with `patients/med` and not `patients/trans` was shown work they couldn't open. On 8.4 that page checks nothing, so there the worklist is the stricter of the two. Every stock group with `patients/med` also holds `patients/trans`.

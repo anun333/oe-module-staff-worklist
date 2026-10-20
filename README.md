@@ -2,7 +2,7 @@
 
 One queue of outstanding staff work across all patients, so nobody has to check four separate reports.
 
-**Status: 0.4.1, a pre-release.** Tested on OpenEMR with synthetic data only, access checks included (see [Compatibility](#compatibility)). It lists many patients' work on one page, so read [Access](#access) and [FOOTPRINT.md](FOOTPRINT.md) before installing, and try it with your own users and settings before giving staff access.
+**Status: 0.5.0, a pre-release.** Tested on OpenEMR with synthetic data only, access checks included (see [Compatibility](#compatibility)). It lists many patients' work on one page, so read [Access](#access) and [FOOTPRINT.md](FOOTPRINT.md) before installing, and try it with your own users and settings before giving staff access.
 
 | Tab | Listed when | Leaves the list when | Default owner |
 |---|---|---|---|
@@ -11,7 +11,8 @@ One queue of outstanding staff work across all patients, so nobody has to check 
 | Referral replies | An outgoing referral has no **Reply Date** after 14 days | Someone enters the reply date on the referral | Referring provider |
 | Care gaps, upcoming visits | A patient with a visit in the next 2 days has clinical reminders due | The visit passes or is cancelled, or the reminders are met | Visit provider |
 | Screening follow-up | A patient's latest PHQ-2, PHQ-9, GAD-7 or AUDIT-C from the last 180 days is at or above the instrument's published cut-off, or is unfinished and could still reach it | Something is coded after it: a later response, a problem or visit diagnosis for the condition, or a brief intervention for alcohol. See [Screening follow-up](#screening-follow-up) | Visit provider, else the patient's provider |
-| Claims follow-up | A claim was denied (OpenEMR records it and posts nothing), was billed to an insurer more than 45 days ago with nothing posted since, or has a line flagged for follow-up in payment posting. See [Claims follow-up](#claims-follow-up) | The claim is billed again or its insurance level is closed, something is posted at that level, or the flag is unticked | Nobody: billing staff take them from Unassigned |
+| Claims follow-up | A claim was denied (OpenEMR records it and posts nothing), had a line written off with a denial reason, was billed to an insurer more than 45 days ago with nothing posted since, had a remittance posted that left its insurance open, or has a line flagged for follow-up in payment posting. See [Claims follow-up](#claims-follow-up) | The claim is billed again or its insurance level is closed, something is posted at that level, or the flag is unticked; a write-off stays until dismissed | Nobody: billing staff take them from Unassigned |
+| Sliding fee re-assessments | With the [Sliding Fee Discount](https://github.com/anun333/oe-module-sliding-fee) module installed: a patient seen in the last 12 months whose assessment runs out within 30 days, has run out, or who was never assessed | A new assessment is recorded | Nobody: the front desk takes them from Unassigned |
 
 Work items are not stored. They're recomputed from OpenEMR data, and the worklist only reads them. Staff do the work in OpenEMR's own screens (the row button opens the right one), and the item disappears when that work is recorded.
 
@@ -136,6 +137,8 @@ The tab lists claims that need billing staff, at most one row per visit:
 |---|---|---|
 | Denied | The visit's latest claim is a denial that OpenEMR's ERA posting recorded. When an 835 says a claim was denied, OpenEMR posts nothing, marks the claim denied, and says "follow up manually" | High |
 | No payer response | The latest claim was billed to an insurer more than 45 days ago, that insurance level isn't closed, and no payment or adjustment has been posted at that level since | Normal; High after 90 days |
+| Line written off with a denial reason | A remittance adjusted a line off ("Adjust code NN", as OpenEMR posts it), paid nothing for it, and gave a reason other than the contractual 45 or 59. OpenEMR before 8.4.1 posted a line denial that way; since openemr/openemr#11868 (in 8.4.1) it refuses to post one | High |
+| Remittance left the insurance open | A payment or adjustment was posted at the claim's level more than 30 days ago and the level is still open. Since 8.4.1, a line OpenEMR won't post stops the rest of that claim's posting and leaves the level open, so this is how such a claim shows | Normal |
 | Flagged for follow-up | Someone ticked **Follow Up** on a line in payment posting | Normal |
 
 - **What each row shows:** the payer and the service date, when the claim was billed or denied, the denial reason codes with their descriptions (from OpenEMR's own list), and the follow-up note.
@@ -143,7 +146,7 @@ The tab lists claims that need billing staff, at most one row per visit:
 - **Window:** claims billed or denied in the last 365 days.
 - **Who sees it:** only users OpenEMR's Billing Manager admits (`acct/eob` or `acct/bill`, with write). The tab, its counts and its actions aren't there for anyone else.
 
-It doesn't yet list lines denied inside a claim that was otherwise paid. OpenEMR posts those as adjustments, and telling a denial from a contractual write-off needs a list of reason codes.
+Telling a line denial from a contractual write-off uses OpenEMR's own rule: on a line paid nothing, any adjustment other than 45 or 59 is a denial. OpenEMR doesn't store the group code with a posted adjustment, so a PI-45 counts as contractual here too.
 
 ## Care gaps run in the background
 
@@ -171,6 +174,7 @@ Who sees what:
 - **Sensitive visits:** see [Safety and privacy behaviour](#safety-and-privacy-behaviour).
 - **Sites:** with **Restrict Users to Facilities** on, see [Who can see which sites](#who-can-see-which-sites).
 - **Claims follow-up** is there only for users OpenEMR's Billing Manager admits (`acct/eob` or `acct/bill`, with write), the same check that page makes.
+- **Sliding fee re-assessments** is there only when the Sliding Fee Discount module is installed and enabled, for users who can read Demographics (`patients/demo`), the check that module's own due list makes.
 - **Referral replies** is there only for users with `patients/trans` (0.4.1), the check OpenEMR's transaction page makes from 8.5 (openemr/openemr#14627); without it, the page that records a reply refuses them. On 8.4.1 that page checks nothing, so there the worklist is the stricter of the two. Every stock group with `patients/med` also holds `patients/trans`.
 
 How that has been checked, on 2026-10-10, on OpenEMR 8.4.1 and current master (8.5.0-dev), with synthetic data and test logins created and removed for the run:
@@ -229,7 +233,7 @@ The unit tests need no database or OpenEMR install. CI runs them, and the footpr
 - Screening follow-up counts responses whatever their status, because OpenEMR's questionnaire runtime saves them all as `in-progress`.
 - Screening follow-up can't see follow-up written only in a note, or a referral made for it (a referral's reason is free text). Dismiss the item with a reason.
 - The PHQ-4 isn't read, because Clinic Forms' PHQ-4 has no total.
-- Claims follow-up doesn't list lines denied inside an otherwise paid claim, and shows how long ago a claim was denied rather than an appeal deadline, since those differ by payer.
+- Claims follow-up shows how long ago a claim was denied rather than an appeal deadline, since those differ by payer. On 8.4.1 and later, a line OpenEMR refused to post is found only through the insurance it left open; the remittance itself names the line.
 - At most 300 rows are shown at once, most urgent first.
 
 ## Other modules for OpenEMR
