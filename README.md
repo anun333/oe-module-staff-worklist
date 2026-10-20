@@ -232,6 +232,18 @@ The unit tests need no database or OpenEMR install. CI runs them, and the footpr
 - Claims follow-up doesn't list lines denied inside an otherwise paid claim, and shows how long ago a claim was denied rather than an appeal deadline, since those differ by payer.
 - At most 300 rows are shown at once, most urgent first.
 
+## Other modules for OpenEMR
+
+From the same project. Each installs with `composer require anun333/<module>` and is then enabled in Modules › Manage Modules.
+
+| Module | What it does |
+|---|---|
+| [Clinic Forms](https://github.com/anun333/oe-module-clinic-forms) | Printable clinic paperwork: consents, privacy notices, referral letters and validated screening questionnaires, with the clinic's own details, in English and Spanish |
+| [UDS Report](https://github.com/anun333/oe-module-uds-report) | HRSA's Uniform Data System report for health centers: the patient, visit and diagnosis tables, eCQM readiness, a Table 9D worksheet and grant evidence |
+| [Sliding Fee Discount](https://github.com/anun333/oe-module-sliding-fee) | HRSA's sliding fee discount program: the schedule checked against Chapter 9, income assessments, and the discount applied |
+| [Care Management](https://github.com/anun333/oe-module-care-management) | CCM, PCM and BHI enrollment with CMS's consent elements, monthly time logging, and the codes each month meets |
+| [Migration](https://github.com/anun333/oe-module-migration) | Records from another EHR, read from the FHIR export certified EHRs offer, checked before import and safe to rerun |
+
 ## License
 
 GPL-3.0-or-later, as OpenEMR. See [LICENSE](LICENSE).
