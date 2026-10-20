@@ -32,6 +32,7 @@ use OpenHealthcare\StaffWorklist\Source\ResultsAwaitingReviewSource;
 use OpenHealthcare\StaffWorklist\Source\ScreeningFollowUpSource;
 use OpenHealthcare\StaffWorklist\Source\PriorAuthorizationSource;
 use OpenHealthcare\StaffWorklist\Source\SlidingFeeDueSource;
+use OpenHealthcare\StaffWorklist\Source\SocialNeedsSource;
 use OpenHealthcare\StaffWorklist\Source\WorkSourceInterface;
 
 final class WorklistService
@@ -97,6 +98,10 @@ final class WorklistService
         // can open that module's menu entry: patients/docs.
         if (AclMain::aclCheckCore('patients', 'docs') && PriorAuthorizationSource::available()) {
             $sources[] = new PriorAuthorizationSource($now);
+        }
+        // Social needs, for users OpenEMR's SDOH history admits (history_sdoh.php: patients/med, write or add-only).
+        if (AclMain::aclCheckCore('patients', 'med', '', ['write', 'addonly'])) {
+            $sources[] = new SocialNeedsSource($now);
         }
         return new self(
             $sources,

@@ -31,8 +31,9 @@ final class ItemKey
     public const SOURCE_CLAIM = 'claim';
     public const SOURCE_SLIDING = 'sliding';
     public const SOURCE_AUTH = 'auth';
+    public const SOURCE_SOCIAL = 'social';
 
-    private const PATTERN = '/^(result|order|referral|caregap|screen|claim|sliding|auth):([1-9]\d{0,17}):((?:(?:phq9|gad7)-)?[1-9]\d{0,17}(?:\.[1-9])?)$/D';
+    private const PATTERN = '/^(result|order|referral|caregap|screen|claim|sliding|auth|social):([1-9]\d{0,17}):((?:(phq9|gad7|sdoh|qr)-)?[1-9]\d{0,17}(?:\.[1-9])?)$/D';
 
     public function __construct(
         public readonly string $source,
@@ -52,11 +53,21 @@ final class ItemKey
         return new self($m[1], (int)$m[2], $m[3]);
     }
 
-    /** The pattern, and a dotted or form-named ref only on a screening item. */
+    /**
+     * The pattern; a dotted ref or a "phq9-"/"gad7-" prefix only on a screening item; a "sdoh-" or "qr-"
+     * prefix, which a social needs item always has, only there.
+     */
     private static function valid(string $key): bool
     {
-        return preg_match(self::PATTERN, $key, $m) === 1
-            && ((!str_contains($m[3], '.') && ctype_digit($m[3])) || $m[1] === self::SOURCE_SCREEN);
+        if (preg_match(self::PATTERN, $key, $m) !== 1) {
+            return false;
+        }
+        $prefix = $m[4] ?? '';
+        return match ($m[1]) {
+            self::SOURCE_SCREEN => in_array($prefix, ['', 'phq9', 'gad7'], true),
+            self::SOURCE_SOCIAL => in_array($prefix, ['sdoh', 'qr'], true) && !str_contains($m[3], '.'),
+            default => $prefix === '' && !str_contains($m[3], '.'),
+        };
     }
 
     public function __toString(): string

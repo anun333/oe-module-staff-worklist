@@ -48,6 +48,8 @@ final class ItemKeyTest extends TestCase
         }
         self::assertNotSame((string)ItemKey::parse('screen:3:phq9-7'), (string)ItemKey::parse('screen:3:7'), "a form's id and a response's never meet");
         self::assertNotNull(ItemKey::parse('auth:3:41'), 'a prior authorization');
+        self::assertNotNull(ItemKey::parse('social:3:sdoh-41'), 'a social needs item from the SDOH history');
+        self::assertNotNull(ItemKey::parse('social:3:qr-41'), 'or from a questionnaire response');
     }
 
     public function testConstructorRejectsADottedRefOutsideScreening(): void
@@ -81,6 +83,10 @@ final class ItemKeyTest extends TestCase
             'a form name with no id' => ['screen:1:phq9-'],
             'a form name after the id' => ['screen:1:7-phq9'],
             'a dotted prior authorization' => ['auth:1:4.2'],
+            'a social needs item with no prefix' => ['social:1:41'],
+            'a screening form name on a social item' => ['social:1:phq9-41'],
+            'a social prefix on a screening item' => ['screen:1:sdoh-41'],
+            'a dotted social item' => ['social:1:qr-41.2'],
         ];
     }
 

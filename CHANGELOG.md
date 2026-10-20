@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0 (2026-10-20)
+
+- **New tab: Social needs follow-up.** A patient's latest positive social needs screen of a kind from the last 180 days, with nothing after it.
+  - **Screens read:** OpenEMR's SDOH history, by the answers OpenEMR itself treats as positive per domain; the Hunger Vital Sign, either question "Often" or "Sometimes" true, including a translated Clinic Forms version, whose answers are coded by position; and the six-item food security survey, positive at a raw score of 2.
+  - **Taken off by:** a referral on or after the screen; for food, housing and financial strain, a service in the UDS module's Table 6A Line 40 to 42 value sets, billed on or after it, once that module has fetched them; or a later negative screen of the same kind.
+  - Interpersonal safety is High. The row names the needs still open.
+  - It's for users with `patients/med` write or add-only, the check OpenEMR's SDOH history page makes.
+
 ## 0.6.0 (2026-10-20)
 
 - **Screening follow-up reads OpenEMR's own PHQ-9 and GAD-7 encounter forms** (`form_phq9`, `form_gad7`), which keep each question's points in a column of their own. A clinic that screened with them got no rows before.
