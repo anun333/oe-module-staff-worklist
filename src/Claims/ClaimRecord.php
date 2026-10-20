@@ -29,6 +29,9 @@ final class ClaimRecord
      * @param int                            $lastLevelClosed form_encounter.last_level_closed
      * @param bool                           $postedSince     a payment or adjustment at that level was posted at or after the version time
      * @param list<array{note: string, at: \DateTimeImmutable}> $flags ar_activity follow-up flags still set
+     * @param \DateTimeImmutable|null        $lastPosted      the latest payment or adjustment at that level since the version time
+     * @param list<array{code: string, reason: string, amount: float, at: \DateTimeImmutable}> $writeOffs lines at that level
+     *        adjusted off with a reason other than the contractual 45 or 59 ("Adjust code NN") and paid nothing in that remittance
      */
     public function __construct(
         public readonly int $pid,
@@ -41,6 +44,8 @@ final class ClaimRecord
         public readonly int $lastLevelClosed,
         public readonly bool $postedSince,
         public readonly array $flags = [],
+        public readonly ?\DateTimeImmutable $lastPosted = null,
+        public readonly array $writeOffs = [],
     ) {
     }
 }

@@ -57,6 +57,10 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
                     WHERE a.pid = c.patient_id AND a.encounter = c.encounter_id AND a.deleted IS NULL
                       AND a.payer_type = c.payer_type AND a.post_time >= c.bill_time
                       AND (a.pay_amount <> 0 OR a.adj_amount <> 0)) AS posted_since,
+                (SELECT MAX(a.post_time) FROM ar_activity AS a
+                    WHERE a.pid = c.patient_id AND a.encounter = c.encounter_id AND a.deleted IS NULL
+                      AND a.payer_type = c.payer_type AND a.post_time >= c.bill_time
+                      AND (a.pay_amount <> 0 OR a.adj_amount <> 0)) AS last_posted,
                 $encounterColumns
             FROM claims AS c
             JOIN (SELECT patient_id, encounter_id, MAX(version) AS version FROM claims GROUP BY patient_id, encounter_id) AS latest
@@ -92,8 +96,34 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
             $rows[$key] ??= $row;
         }
 
+        // Lines a remittance adjusted off ("Adjust code NN", as OpenEMR posts them) while paying
+        // nothing for them in that remittance.
+        $writeOffSql = "SELECT a.pid, a.encounter, a.payer_type, a.code, a.memo, a.adj_amount, a.post_time
+            FROM ar_activity AS a
+            WHERE a.deleted IS NULL AND a.payer_type > 0 AND a.adj_amount > 0 AND a.memo LIKE 'Adjust code %'
+              AND a.post_time >= ? " . ($pid === null ? '' : 'AND a.pid = ?') . "
+              AND NOT EXISTS (SELECT 1 FROM ar_activity AS p
+                  WHERE p.pid = a.pid AND p.encounter = a.encounter AND p.code = a.code AND p.session_id = a.session_id
+                    AND p.payer_type = a.payer_type AND p.deleted IS NULL AND p.pay_amount <> 0)
+            ORDER BY a.post_time";
+        $writeOffs = [];
+        foreach (QueryUtils::fetchRecords($writeOffSql, $pid === null ? [$since] : [$since, $pid]) as $row) {
+            $reason = ClaimRules::writeOffReason((string)$row['memo']);
+            $at = self::date($row['post_time'] ?? null);
+            if ($reason !== null && $at !== null) {
+                $writeOffs[$row['pid'] . ':' . $row['encounter']][] = ['level' => (int)$row['payer_type'], 'code' => trim((string)$row['code']),
+                    'reason' => $reason, 'amount' => (float)$row['adj_amount'], 'at' => $at];
+            }
+        }
         $items = [];
         foreach ($rows as $key => $row) {
+            $versionTime = self::date($row['bill_time'] ?? null);
+            $level = (int)($row['payer_type'] ?? 0);
+            // Only write-offs at the level billed, posted since this claim version.
+            $lines = array_values(array_map(
+                static fn(array $w): array => ['code' => $w['code'], 'reason' => $w['reason'], 'amount' => $w['amount'], 'at' => $w['at']],
+                array_filter($writeOffs[$key] ?? [], static fn(array $w): bool => $w['level'] === $level && $versionTime !== null && $w['at'] >= $versionTime),
+            ));
             $claim = new ClaimRecord(
                 (int)$row['pid'],
                 (int)$row['encounter'],
@@ -105,6 +135,8 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
                 (int)$row['last_level_closed'],
                 (int)($row['posted_since'] ?? 0) === 1,
                 $flags[$key] ?? [],
+                self::date($row['last_posted'] ?? null),
+                $lines,
             );
             $decision = $this->rules->decide($claim);
             if ($decision !== null) {
@@ -126,6 +158,9 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
             ClaimRules::DENIED => xl('Claim denied by') . ' ' . $payer,
             ClaimRules::NO_RESPONSE => xl('No response from') . ' ' . $payer . ' ' . xl('in') . ' '
                 . PriorityPolicy::ageDays($decision['since'], $this->now) . ' ' . xl('days'),
+            ClaimRules::WRITTEN_OFF => xl('Line written off with a denial reason by') . ' ' . $payer,
+            ClaimRules::PARTLY_POSTED => xl('Remittance posted, insurance still open after') . ' '
+                . PriorityPolicy::ageDays($decision['since'], $this->now) . ' ' . xl('days'),
             default => xl('Flagged for follow-up'),
         };
         if ($decision['kind'] === ClaimRules::DENIED) {
@@ -140,6 +175,16 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
             if ($reasons === []) {
                 $facts[] = xl('No reason recorded');
             }
+        } elseif ($decision['kind'] === ClaimRules::WRITTEN_OFF) {
+            $descriptions = BillingUtilities::CLAIM_ADJUSTMENT_REASON_CODES;
+            foreach ($claim->writeOffs as $w) {
+                $description = $descriptions[$w['reason']] ?? null;
+                $facts[] = $w['code'] . ': ' . xl('reason') . ' ' . $w['reason'] . (is_string($description) ? ' ' . ClaimRules::shortDescription($description) : '')
+                    . ', ' . sprintf('%.2f', $w['amount']) . ' ' . xl('written off') . ' ' . oeFormatShortDate($w['at']->format('Y-m-d'));
+            }
+        } elseif ($decision['kind'] === ClaimRules::PARTLY_POSTED) {
+            $facts[] = xl('Last posted') . ' ' . oeFormatShortDate($decision['since']->format('Y-m-d'));
+            $facts[] = xl('A line OpenEMR could not post stops the rest of the claim\'s posting and leaves the insurance open');
         } elseif ($decision['kind'] === ClaimRules::NO_RESPONSE && $claim->versionTime !== null) {
             $facts[] = xl('Billed') . ' ' . oeFormatShortDate($claim->versionTime->format('Y-m-d'));
         }

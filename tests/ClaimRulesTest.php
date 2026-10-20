@@ -84,7 +84,43 @@ final class ClaimRulesTest extends TestCase
         return new ClaimRules(new PriorityPolicy(), new \DateTimeImmutable(self::NOW));
     }
 
-    /** @param list<array{note: string, at: \DateTimeImmutable}> $flags */
+    public function testALineWrittenOffWithADenialReasonIsHighPriorityEvenWithTheLevelClosed(): void
+    {
+        $line = ['code' => '99213', 'reason' => '50', 'amount' => 120.0, 'at' => new \DateTimeImmutable('2026-09-20 10:00:00')];
+        $decision = $this->rules()->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-09-01', lastLevelClosed: 1, postedSince: true, writeOffs: [$line]));
+        $this->assertSame([ClaimRules::WRITTEN_OFF, WorkItem::PRIORITY_HIGH], self::kindAndPriority($decision), 'before 8.4.1 OpenEMR closed the level as it wrote the line off');
+        $this->assertEquals($line['at'], $decision['since']);
+        $this->assertNull($this->rules()->decide(self::claim(ClaimRecord::STATUS_BILLED, '2025-09-01', lastLevelClosed: 1, postedSince: true, writeOffs: [$line])),
+            'outside the year');
+    }
+
+    public function testOnlyRemittanceAdjustmentsWithADenialReasonAreWriteOffs(): void
+    {
+        $this->assertSame('50', ClaimRules::writeOffReason('Adjust code 50'));
+        $this->assertSame('B7', ClaimRules::writeOffReason(' Adjust code B7 '));
+        $this->assertNull(ClaimRules::writeOffReason('Adjust code 45'), 'contractual');
+        $this->assertNull(ClaimRules::writeOffReason('Adjust code 59'), 'contractual');
+        $this->assertNull(ClaimRules::writeOffReason('Ins1 dedbl: 20.00'));
+        $this->assertNull(ClaimRules::writeOffReason('Sliding fee discount'));
+        $this->assertNull(ClaimRules::writeOffReason('Adjust code'));
+    }
+
+    public function testARemittanceThatLeftTheLevelOpenIsListedAfter30Days(): void
+    {
+        $rules = $this->rules();
+        $this->assertNull($rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-08-01', postedSince: true, lastPosted: '2026-09-25')), '23 days: not yet');
+        $this->assertSame([ClaimRules::PARTLY_POSTED, WorkItem::PRIORITY_NORMAL],
+            self::kindAndPriority($rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-08-01', postedSince: true, lastPosted: '2026-09-01'))), '47 days');
+        $this->assertNull($rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-08-01', lastLevelClosed: 1, postedSince: true, lastPosted: '2026-09-01')),
+            'the level was closed');
+        $this->assertSame(ClaimRules::NO_RESPONSE, $rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-08-01'))['kind'] ?? null,
+            'nothing posted is no response, not partly posted');
+    }
+
+    /**
+     * @param list<array{note: string, at: \DateTimeImmutable}> $flags
+     * @param list<array{code: string, reason: string, amount: float, at: \DateTimeImmutable}> $writeOffs
+     */
     private static function claim(
         ?int $status,
         ?string $time,
@@ -92,8 +128,11 @@ final class ClaimRulesTest extends TestCase
         int $lastLevelClosed = 0,
         bool $postedSince = false,
         array $flags = [],
+        ?string $lastPosted = null,
+        array $writeOffs = [],
     ): ClaimRecord {
-        return new ClaimRecord(7, 70, $status, $level, 'Payer', $time === null ? null : new \DateTimeImmutable($time), '99213__CO_16', $lastLevelClosed, $postedSince, $flags);
+        return new ClaimRecord(7, 70, $status, $level, 'Payer', $time === null ? null : new \DateTimeImmutable($time), '99213__CO_16', $lastLevelClosed, $postedSince, $flags,
+            $lastPosted === null ? null : new \DateTimeImmutable($lastPosted), $writeOffs);
     }
 
     /**

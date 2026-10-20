@@ -30,6 +30,7 @@ use OpenHealthcare\StaffWorklist\Source\OrdersMissingResultsSource;
 use OpenHealthcare\StaffWorklist\Source\ReferralsAwaitingReplySource;
 use OpenHealthcare\StaffWorklist\Source\ResultsAwaitingReviewSource;
 use OpenHealthcare\StaffWorklist\Source\ScreeningFollowUpSource;
+use OpenHealthcare\StaffWorklist\Source\SlidingFeeDueSource;
 use OpenHealthcare\StaffWorklist\Source\WorkSourceInterface;
 
 final class WorklistService
@@ -85,6 +86,11 @@ final class WorklistService
         // Claims work only for users core's Billing Manager admits (interface/billing/billing_report.php).
         if (AclMain::aclCheckCore('acct', 'eob', '', 'write') || AclMain::aclCheckCore('acct', 'bill', '', 'write')) {
             $sources[] = new ClaimsFollowUpSource($policy, $now);
+        }
+        // Sliding fee re-assessments, when that module is installed and enabled, for users who can
+        // read Demographics, the check the Sliding Fee Discount module's own due list makes.
+        if (AclMain::aclCheckCore('patients', 'demo') && SlidingFeeDueSource::available()) {
+            $sources[] = new SlidingFeeDueSource($now);
         }
         return new self(
             $sources,

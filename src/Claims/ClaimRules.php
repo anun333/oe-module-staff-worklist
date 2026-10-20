@@ -4,10 +4,16 @@
  * Which claims need billing staff, and why:
  *  - denied: the latest claim version is a denial OpenEMR recorded from a remittance
  *    (status 7, nothing posted), with nothing posted at that level since and the level open;
+ *  - written off: a remittance adjusted a line off, paying nothing for it, with a reason
+ *    other than the contractual 45 or 59. OpenEMR before 8.4.1 posted such a line denial as an
+ *    "Adjust code" adjustment; since #11868 (in 8.4.1) it refuses to post it, as here;
  *  - no response: billed to an insurer longer ago than the policy allows, with nothing
  *    posted at that level since and the level open;
+ *  - partly posted: a remittance posted to the claim and its level is still open long after.
+ *    Since 8.4.1 a line OpenEMR won't post stops the rest of that claim's posting and leaves
+ *    the level open, which is what this catches;
  *  - flagged: staff ticked Follow Up on a line while posting.
- * A denial outranks no response, which outranks a flag; the facts of the others are kept.
+ * Each outranks the next; the facts of the others are kept.
  *
  * @package   OpenEMR
  * @link      https://www.open-emr.org
@@ -28,6 +34,10 @@ final class ClaimRules
     public const DENIED = 'denied';
     public const NO_RESPONSE = 'no_response';
     public const FLAGGED = 'flagged';
+    public const WRITTEN_OFF = 'written_off';
+    public const PARTLY_POSTED = 'partly_posted';
+    /** Adjustment reasons OpenEMR treats as contractual write-offs (CO-45, CO-59) when a line is paid nothing. */
+    public const CONTRACTUAL = ['45', '59'];
 
     public function __construct(
         private readonly PriorityPolicy $policy,
@@ -56,12 +66,22 @@ final class ClaimRules
         if ($open && $claim->status === ClaimRecord::STATUS_DENIED) {
             return ['kind' => self::DENIED, 'priority' => WorkItem::PRIORITY_HIGH, 'since' => $claim->versionTime, 'flagged' => $flagged];
         }
+        if ($claim->writeOffs !== [] && $claim->versionTime !== null && $claim->versionTime >= $this->windowStart()) {
+            $since = min(array_map(static fn(array $w): \DateTimeImmutable => $w['at'], $claim->writeOffs));
+            return ['kind' => self::WRITTEN_OFF, 'priority' => WorkItem::PRIORITY_HIGH, 'since' => $since, 'flagged' => $flagged];
+        }
         if ($open && $claim->status === ClaimRecord::STATUS_BILLED) {
             $days = PriorityPolicy::ageDays($claim->versionTime, $this->now);
             if ($days > $this->policy->claimNoResponseDays) {
                 $priority = $days > $this->policy->claimNoResponseHighDays ? WorkItem::PRIORITY_HIGH : WorkItem::PRIORITY_NORMAL;
                 return ['kind' => self::NO_RESPONSE, 'priority' => $priority, 'since' => $claim->versionTime, 'flagged' => $flagged];
             }
+        }
+        $levelOpen = $claim->versionTime !== null && $claim->versionTime >= $this->windowStart()
+            && $claim->level >= 1 && $claim->lastLevelClosed < $claim->level;
+        if ($levelOpen && $claim->status === ClaimRecord::STATUS_BILLED && $claim->postedSince && $claim->lastPosted !== null
+            && PriorityPolicy::ageDays($claim->lastPosted, $this->now) > $this->policy->claimPartlyPostedDays) {
+            return ['kind' => self::PARTLY_POSTED, 'priority' => WorkItem::PRIORITY_NORMAL, 'since' => $claim->lastPosted, 'flagged' => $flagged];
         }
         if ($flagged) {
             $since = min(array_map(static fn(array $f): \DateTimeImmutable => $f['at'], $claim->flags));
@@ -87,6 +107,18 @@ final class ClaimRules
             $out[] = ['code' => $parts[0], 'modifier' => $parts[1], 'group' => $parts[2], 'reason' => $parts[3]];
         }
         return $out;
+    }
+
+    /**
+     * The reason in an adjustment OpenEMR posted from a remittance ("Adjust code 50"), or null
+     * for any other memo. Contractual reasons (45, 59) are left out: they aren't denials.
+     */
+    public static function writeOffReason(string $memo): ?string
+    {
+        if (preg_match('/^Adjust code (\w+)$/', trim($memo), $m) !== 1 || in_array($m[1], self::CONTRACTUAL, true)) {
+            return null;
+        }
+        return $m[1];
     }
 
     /** A reason code's description without the CARC list's "Usage:" note. */

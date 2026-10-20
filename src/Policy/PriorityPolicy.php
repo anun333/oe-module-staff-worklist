@@ -40,6 +40,8 @@ final class PriorityPolicy
         public readonly int $claimNoResponseHighDays = 90,
         // Claims billed or denied longer ago than this aren't listed.
         public readonly int $claimWindowDays = 365,
+        // A remittance posted to a claim and its insurance level is still open this many days later.
+        public readonly int $claimPartlyPostedDays = 30,
     ) {
     }
 

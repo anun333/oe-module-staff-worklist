@@ -27,8 +27,9 @@ final class ItemKey
     public const SOURCE_CAREGAP = 'caregap';
     public const SOURCE_SCREEN = 'screen';
     public const SOURCE_CLAIM = 'claim';
+    public const SOURCE_SLIDING = 'sliding';
 
-    private const PATTERN = '/^(result|order|referral|caregap|screen|claim):([1-9]\d{0,17}):([1-9]\d{0,17}(?:\.[1-9])?)$/D';
+    private const PATTERN = '/^(result|order|referral|caregap|screen|claim|sliding):([1-9]\d{0,17}):([1-9]\d{0,17}(?:\.[1-9])?)$/D';
 
     public function __construct(
         public readonly string $source,
