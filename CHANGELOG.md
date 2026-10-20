@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0 (2026-10-20)
+
+- **Screening follow-up reads OpenEMR's own PHQ-9 and GAD-7 encounter forms** (`form_phq9`, `form_gad7`), which keep each question's points in a column of their own. A clinic that screened with them got no rows before.
+  - They're scored as questionnaires are, with the same cut-offs and the same rule for unfinished screens. The row says "From the PHQ-9 encounter form".
+  - A deleted form isn't read. The difficulty question isn't scored.
+  - Their work items are keyed by the form ("screen:<pid>:phq9-<id>"), since form ids and response ids are different tables'.
+- **New tab: Prior authorizations,** from OpenEMR's own Prior Authorizations module when it's installed and enabled.
+  - An authorization in force is listed when its units are used up (High), when it ends within 14 days, or when a tenth or less of its units are left.
+  - It's for users with `patients/docs`, the check that module's menu entry makes.
+- **Fixed:** a claims follow-up line read "the claim`s posting". OpenEMR's `xl()` turns an apostrophe into a backtick, so the text no longer has one, and a test now fails on any translated string with an apostrophe or quote mark.
+- `tools/footprint.php` refuses web requests.
+
 ## 0.5.0 (2026-10-19)
 
 - **Claims follow-up: lines written off with a denial reason.** A remittance that adjusted a line off ("Adjust code NN"), paid nothing for it, and gave a reason other than the contractual 45 or 59 is listed, High.

@@ -30,6 +30,7 @@ use OpenHealthcare\StaffWorklist\Source\OrdersMissingResultsSource;
 use OpenHealthcare\StaffWorklist\Source\ReferralsAwaitingReplySource;
 use OpenHealthcare\StaffWorklist\Source\ResultsAwaitingReviewSource;
 use OpenHealthcare\StaffWorklist\Source\ScreeningFollowUpSource;
+use OpenHealthcare\StaffWorklist\Source\PriorAuthorizationSource;
 use OpenHealthcare\StaffWorklist\Source\SlidingFeeDueSource;
 use OpenHealthcare\StaffWorklist\Source\WorkSourceInterface;
 
@@ -91,6 +92,11 @@ final class WorklistService
         // read Demographics, the check the Sliding Fee Discount module's own due list makes.
         if (AclMain::aclCheckCore('patients', 'demo') && SlidingFeeDueSource::available()) {
             $sources[] = new SlidingFeeDueSource($now);
+        }
+        // Prior authorizations, when OpenEMR's own Prior Authorizations module is enabled, for users who
+        // can open that module's menu entry: patients/docs.
+        if (AclMain::aclCheckCore('patients', 'docs') && PriorAuthorizationSource::available()) {
+            $sources[] = new PriorAuthorizationSource($now);
         }
         return new self(
             $sources,

@@ -2,7 +2,7 @@
 
 One queue of outstanding staff work across all patients, so nobody has to check four separate reports.
 
-**Status: 0.5.0, a pre-release.** Tested on OpenEMR with synthetic data only, access checks included (see [Compatibility](#compatibility)). It lists many patients' work on one page, so read [Access](#access) and [FOOTPRINT.md](FOOTPRINT.md) before installing, and try it with your own users and settings before giving staff access.
+**Status: 0.6.0, a pre-release.** Tested on OpenEMR with synthetic data only, access checks included (see [Compatibility](#compatibility)). It lists many patients' work on one page, so read [Access](#access) and [FOOTPRINT.md](FOOTPRINT.md) before installing, and try it with your own users and settings before giving staff access.
 
 | Tab | Listed when | Leaves the list when | Default owner |
 |---|---|---|---|
@@ -13,6 +13,7 @@ One queue of outstanding staff work across all patients, so nobody has to check 
 | Screening follow-up | A patient's latest PHQ-2, PHQ-9, GAD-7 or AUDIT-C from the last 180 days is at or above the instrument's published cut-off, or is unfinished and could still reach it | Something is coded after it: a later response, a problem or visit diagnosis for the condition, or a brief intervention for alcohol. See [Screening follow-up](#screening-follow-up) | Visit provider, else the patient's provider |
 | Claims follow-up | A claim was denied (OpenEMR records it and posts nothing), had a line written off with a denial reason, was billed to an insurer more than 45 days ago with nothing posted since, had a remittance posted that left its insurance open, or has a line flagged for follow-up in payment posting. See [Claims follow-up](#claims-follow-up) | The claim is billed again or its insurance level is closed, something is posted at that level, or the flag is unticked; a write-off stays until dismissed | Nobody: billing staff take them from Unassigned |
 | Sliding fee re-assessments | With the [Sliding Fee Discount](https://github.com/anun333/oe-module-sliding-fee) module installed: a patient seen in the last 12 months whose assessment runs out within 30 days, has run out, or who was never assessed | A new assessment is recorded | Nobody: the front desk takes them from Unassigned |
+| Prior authorizations | With OpenEMR's own Prior Authorizations module enabled: an authorization in force whose units are used up (High), that ends within 14 days, or with a tenth or less of its units left | It ends, or a new authorization is recorded (a new row) | Nobody: the front desk takes them from Unassigned |
 
 Work items are not stored. They're recomputed from OpenEMR data, and the worklist only reads them. Staff do the work in OpenEMR's own screens (the row button opens the right one), and the item disappears when that work is recorded.
 
@@ -82,6 +83,8 @@ To size the worklist for a real clinic, run the read-only `tools/profile-counts.
 ## Screening follow-up
 
 The tab reads the questionnaire responses OpenEMR's own runtime saves, from the encounter form (New Questionnaire) and the patient's Questionnaires page. It lists a patient's latest response to an instrument when its total is at or above the cut-off the instrument's validation paper gives, and nothing is coded after it.
+
+**OpenEMR's own PHQ-9 and GAD-7 encounter forms** (0.6.0) are read too: Encounter › PHQ-9 and GAD-7, which keep each question's points in a column of their own. They're scored the same way, with the same cut-offs, and the row says which form it came from. A deleted form isn't read, and the forms' difficulty question isn't scored, as on the published instruments. A site that hasn't registered those forms simply has none.
 
 **The total is counted from the answers** (0.4.0), not read from the total the form saved. Each answer's points come from the questionnaire's own answer options, and the questions are found by their LOINC codes. When a questionnaire doesn't code its questions, the saved total is read instead, as before.
 
@@ -175,6 +178,7 @@ Who sees what:
 - **Sites:** with **Restrict Users to Facilities** on, see [Who can see which sites](#who-can-see-which-sites).
 - **Claims follow-up** is there only for users OpenEMR's Billing Manager admits (`acct/eob` or `acct/bill`, with write), the same check that page makes.
 - **Sliding fee re-assessments** is there only when the Sliding Fee Discount module is installed and enabled, for users who can read Demographics (`patients/demo`), the check that module's own due list makes.
+- **Prior authorizations** is there only when OpenEMR's Prior Authorizations module is installed and enabled, for users with `patients/docs`, the check that module's own menu entry makes.
 - **Referral replies** is there only for users with `patients/trans` (0.4.1), the check OpenEMR's transaction page makes from 8.5 (openemr/openemr#14627); without it, the page that records a reply refuses them. On 8.4.1 that page checks nothing, so there the worklist is the stricter of the two. Every stock group with `patients/med` also holds `patients/trans`.
 
 How that has been checked, on 2026-10-10, on OpenEMR 8.4.1 and current master (8.5.0-dev), with synthetic data and test logins created and removed for the run:
@@ -205,7 +209,7 @@ On 8.1.0, 8.2.0, 8.3.0 and 8.4.0 (checked 2026-10-12 with `dev/module_compat_che
 
 **Install** means a fresh OpenEMR that installed itself, then `composer require` from this repository, then Register, Install and Enable in Modules › Manage Modules. Each step's effect was checked: where the files went, the three tables, the background service switching on (and off again when disabled), the menu entry and the permission it requires, the page rendering, and no PHP warnings from the module in Apache's logs.
 
-**Queues** means synthetic patients covering each queue, and the page and action endpoint driven as an administrator. Screening follow-up (0.4.0) is checked on 8.4.1 and on master 1faefbbeb9 (2026-10-18), with `dev/worklist_screens_check.py` in the openhealthcare repository. That check covers each instrument at and under its cut-off, each thing that clears a row, the window, a deleted encounter form, and a PHQ-9 filled in OpenEMR's own Questionnaires page. Since 0.4.0 it also covers full PHQ-9s with questions skipped: unfinished, already at the cut-off, unable to reach it, empty, question 9 alone, LOINC's own shape, and an unfinished row dismissed and then finished in place. Claims follow-up (0.3.0) is checked on 8.4.1 and on master 1faefbbeb9, with `dev/worklist_claims_check.py`. That check posts a synthetic 835 through OpenEMR's own ERA posting (a denial and a payment), and covers claims billed 10, 60 and 100 days ago, a follow-up flag, and each one clearing. Items appear with the right priority and site, actions work and are logged, signing a result or cancelling a visit clears its items, and the site picker narrows the list. **Access** means the five checks listed under [Access](#access).
+**Queues** means synthetic patients covering each queue, and the page and action endpoint driven as an administrator. Screening follow-up (0.4.0) is checked on 8.4.1 and on master 1faefbbeb9 (2026-10-18), with `dev/worklist_screens_check.py` in the openhealthcare repository. That check covers each instrument at and under its cut-off, each thing that clears a row, the window, a deleted encounter form, and a PHQ-9 filled in OpenEMR's own Questionnaires page. Since 0.4.0 it also covers full PHQ-9s with questions skipped: unfinished, already at the cut-off, unable to reach it, empty, question 9 alone, LOINC's own shape, and an unfinished row dismissed and then finished in place. OpenEMR's own PHQ-9 and GAD-7 forms and the prior authorizations tab (0.6.0) are checked on 8.4.1 with `dev/worklist_core_check.py`: a PHQ-9 form at the cut-off, a GAD-7 form unfinished, a deleted form and one below the cut-off; authorizations used up, ending, nearly used, ended, plentiful and not started. Claims follow-up (0.3.0) is checked on 8.4.1 and on master 1faefbbeb9, with `dev/worklist_claims_check.py`. That check posts a synthetic 835 through OpenEMR's own ERA posting (a denial and a payment), and covers claims billed 10, 60 and 100 days ago, a follow-up flag, and each one clearing. Items appear with the right priority and site, actions work and are logged, signing a result or cancelling a visit clears its items, and the site picker narrows the list. **Access** means the five checks listed under [Access](#access).
 
 ## Development
 

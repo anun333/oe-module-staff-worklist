@@ -23,7 +23,7 @@ final class WorklistFilter
     private const VIEWS = [ItemState::STATUS_OPEN, ItemState::STATUS_SNOOZED, ItemState::STATUS_DISMISSED];
     private const SCOPES = [self::SCOPE_MINE, self::SCOPE_UNASSIGNED, self::SCOPE_ALL];
     private const SOURCES = [
-        ItemKey::SOURCE_RESULT, ItemKey::SOURCE_ORDER, ItemKey::SOURCE_REFERRAL, ItemKey::SOURCE_CAREGAP, ItemKey::SOURCE_SCREEN, ItemKey::SOURCE_CLAIM, ItemKey::SOURCE_SLIDING,
+        ItemKey::SOURCE_RESULT, ItemKey::SOURCE_ORDER, ItemKey::SOURCE_REFERRAL, ItemKey::SOURCE_CAREGAP, ItemKey::SOURCE_SCREEN, ItemKey::SOURCE_CLAIM, ItemKey::SOURCE_SLIDING, ItemKey::SOURCE_AUTH,
     ];
 
     /**

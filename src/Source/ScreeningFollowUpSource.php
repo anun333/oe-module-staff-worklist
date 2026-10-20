@@ -2,9 +2,10 @@
 
 /**
  * Screening totals at or above their published cut-off with nothing recorded after
- * them (ScreeningRules), from the questionnaire responses OpenEMR's own runtime saves.
- * A response whose encounter form was deleted isn't read: OpenEMR keeps the response
- * row when the form is deleted.
+ * them (ScreeningRules), from the questionnaire responses OpenEMR's own runtime saves,
+ * and from OpenEMR's own PHQ-9 and GAD-7 encounter forms (CoreFormScoring). A response
+ * whose encounter form was deleted isn't read: OpenEMR keeps the response row when the
+ * form is deleted; a deleted PHQ-9 or GAD-7 form isn't read either.
  *
  * @package   OpenEMR
  * @link      https://www.open-emr.org
@@ -21,6 +22,7 @@ use OpenEMR\Common\Database\QueryUtils;
 use OpenHealthcare\StaffWorklist\Model\ItemKey;
 use OpenHealthcare\StaffWorklist\Model\PatientRef;
 use OpenHealthcare\StaffWorklist\Model\WorkItem;
+use OpenHealthcare\StaffWorklist\Screening\CoreFormScoring;
 use OpenHealthcare\StaffWorklist\Screening\FollowUpRecord;
 use OpenHealthcare\StaffWorklist\Screening\ResponseScoring;
 use OpenHealthcare\StaffWorklist\Screening\ScreenFinding;
@@ -92,10 +94,15 @@ final class ScreeningFollowUpSource implements WorkSourceInterface
             if ($date === null || $scores === [] || $patient->deceased) {
                 continue;
             }
-            $id = (int)$row['id'];
-            $responses[] = new ScreenResponse($id, $patient->pid, $date, $scores);
-            $rows[$id] = $row;
+            $response = new ScreenResponse((int)$row['id'], $patient->pid, $date, $scores);
+            $responses[] = $response;
+            $rows[$response->ref] = $row;
             $sexByPid[$patient->pid] = is_string($row['sex'] ?? null) ? $row['sex'] : null;
+        }
+        foreach ($this->coreForms($pid) as [$response, $row]) {
+            $responses[] = $response;
+            $rows[$response->ref] = $row;
+            $sexByPid[$response->pid] = is_string($row['sex'] ?? null) ? $row['sex'] : null;
         }
         if ($responses === []) {
             return [];
@@ -103,9 +110,50 @@ final class ScreeningFollowUpSource implements WorkSourceInterface
 
         $items = [];
         foreach ($this->rules->findings($responses, $sexByPid, $this->records(array_keys($sexByPid))) as $finding) {
-            $items[] = $this->toItem($finding, $rows[$finding->response->id]);
+            $items[] = $this->toItem($finding, $rows[$finding->response->ref]);
         }
         return $items;
+    }
+
+    /**
+     * OpenEMR's own PHQ-9 and GAD-7 encounter forms in the window, not deleted, scored.
+     *
+     * @return list<array{0: ScreenResponse, 1: array<string, mixed>}>
+     */
+    private function coreForms(?int $pid): array
+    {
+        $out = [];
+        foreach (CoreFormScoring::FORMS as $formdir => $form) {
+            $exists = QueryUtils::fetchRecords('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?', [$form['table']]);
+            if ($exists === []) {
+                continue;
+            }
+            $columns = implode(', ', array_map(static fn(string $c): string => "s.`$c`", $form['columns']));
+            $sql = "SELECT s.id, s.pid, s.date, $columns, ru.fname AS by_fname, ru.lname AS by_lname,
+                    fe.facility_id AS site_id, fe.provider_id AS visit_provider, fe.sensitivity,
+                    pd.providerID AS patient_provider, pd.sex,
+                    " . PatientRef::SQL_COLUMNS . "
+                FROM `{$form['table']}` AS s
+                JOIN forms AS f ON f.form_id = s.id AND f.formdir = ? AND f.pid = s.pid AND f.deleted = 0
+                JOIN patient_data AS pd ON pd.pid = s.pid
+                LEFT JOIN form_encounter AS fe ON fe.encounter = f.encounter AND fe.pid = f.pid
+                LEFT JOIN users AS ru ON ru.username = f.user
+                WHERE s.date >= ?" . ($pid !== null ? ' AND s.pid = ?' : '');
+            $binds = [$formdir, $this->rules->windowStart()->format('Y-m-d H:i:s')];
+            if ($pid !== null) {
+                $binds[] = $pid;
+            }
+            foreach (QueryUtils::fetchRecords($sql, $binds) as $row) {
+                $date = self::date($row['date'] ?? null);
+                $scores = CoreFormScoring::score($formdir, $row);
+                $patient = PatientRef::fromRow((int)$row['pid'], $row, $this->now);
+                if ($date === null || $scores === [] || $patient->deceased) {
+                    continue;
+                }
+                $out[] = [new ScreenResponse((int)$row['id'], $patient->pid, $date, $scores, $formdir), $row + ['form_name' => $form['name']]];
+            }
+        }
+        return $out;
     }
 
     /**
@@ -160,7 +208,10 @@ final class ScreeningFollowUpSource implements WorkSourceInterface
         $answered = $detail !== null && !$detail->isFinished()
             ? sprintf(xl('%1$d of %2$d questions answered'), $detail->answered, $detail->questions)
             : null;
-        $ref = (string)$finding->response->id;
+        $ref = $finding->response->ref;
+        if ($finding->response->form !== '') {
+            $facts[] = sprintf(xl('From the %s encounter form'), (string)($row['form_name'] ?? $finding->response->form));
+        }
 
         if ($finding->kind === ScreenFinding::UNFINISHED) {
             $title = sprintf(xl('%1$s not finished: %2$s, %3$s points so far'), $instrument->name, (string)$answered, $score);

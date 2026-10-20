@@ -39,6 +39,17 @@ final class ItemKeyTest extends TestCase
         self::assertNotSame((string)ItemKey::parse('screen:3:12.2'), (string)ItemKey::parse('screen:3:122'));
     }
 
+    public function testAScreenFromOpenEmrsOwnFormsNamesTheForm(): void
+    {
+        foreach (['screen:3:phq9-7', 'screen:3:gad7-7', 'screen:3:phq9-7.2'] as $raw) {
+            $key = ItemKey::parse($raw);
+            self::assertNotNull($key, $raw);
+            self::assertSame($raw, (string)$key);
+        }
+        self::assertNotSame((string)ItemKey::parse('screen:3:phq9-7'), (string)ItemKey::parse('screen:3:7'), "a form's id and a response's never meet");
+        self::assertNotNull(ItemKey::parse('auth:3:41'), 'a prior authorization');
+    }
+
     public function testConstructorRejectsADottedRefOutsideScreening(): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -65,6 +76,11 @@ final class ItemKeyTest extends TestCase
             'two digits after the dot' => ['screen:1:12.10'],
             'dot with nothing after' => ['screen:1:12.'],
             'two dots' => ['screen:1:12.2.9'],
+            'a form name outside screening' => ['order:1:phq9-7'],
+            'an unknown form name' => ['screen:1:audit-7'],
+            'a form name with no id' => ['screen:1:phq9-'],
+            'a form name after the id' => ['screen:1:7-phq9'],
+            'a dotted prior authorization' => ['auth:1:4.2'],
         ];
     }
 

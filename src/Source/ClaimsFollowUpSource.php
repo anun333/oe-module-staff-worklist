@@ -184,7 +184,7 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
             }
         } elseif ($decision['kind'] === ClaimRules::PARTLY_POSTED) {
             $facts[] = xl('Last posted') . ' ' . oeFormatShortDate($decision['since']->format('Y-m-d'));
-            $facts[] = xl('A line OpenEMR could not post stops the rest of the claim\'s posting and leaves the insurance open');
+            $facts[] = xl('A line OpenEMR could not post stops the rest of the claim from posting and leaves the insurance open');
         } elseif ($decision['kind'] === ClaimRules::NO_RESPONSE && $claim->versionTime !== null) {
             $facts[] = xl('Billed') . ' ' . oeFormatShortDate($claim->versionTime->format('Y-m-d'));
         }

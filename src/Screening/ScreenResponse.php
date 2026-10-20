@@ -16,15 +16,21 @@ namespace OpenHealthcare\StaffWorklist\Screening;
 
 final class ScreenResponse
 {
+    /** The work item's ref: the response's id, or for OpenEMR's own PHQ-9 or GAD-7 form "phq9-<form id>". */
+    public readonly string $ref;
+
     /**
-     * @param int                            $id     questionnaire_response.id
-     * @param array<string, InstrumentScore> $scores total code => score (ResponseScoring::read)
+     * @param int                            $id     questionnaire_response.id, or the form's own id
+     * @param array<string, InstrumentScore> $scores total code => score (ResponseScoring::read, CoreFormScoring::score)
+     * @param string                         $form   the core form it came from ("phq9", "gad7"), or '' for a questionnaire response
      */
     public function __construct(
         public readonly int $id,
         public readonly int $pid,
         public readonly \DateTimeImmutable $date,
         public readonly array $scores,
+        public readonly string $form = '',
     ) {
+        $this->ref = ($form !== '' ? $form . '-' : '') . $id;
     }
 }
