@@ -68,6 +68,7 @@ $sourceLabels = [
     ItemKey::SOURCE_SLIDING => xl('Sliding fee re-assessments'),
     ItemKey::SOURCE_AUTH => xl('Prior authorizations'),
     ItemKey::SOURCE_SOCIAL => xl('Social needs follow-up'),
+    ItemKey::SOURCE_CAREMGMT => xl('Care management, not billed'),
 ];
 $sourceLabels = array_filter($sourceLabels, static fn(string $source): bool => $service->hasSource($source), ARRAY_FILTER_USE_KEY);
 $viewLabels = [
@@ -91,6 +92,7 @@ $ownerRoles = [
     ItemKey::SOURCE_SLIDING => xl('Front desk'),
     ItemKey::SOURCE_AUTH => xl('Front desk'),
     ItemKey::SOURCE_SOCIAL => xl('Care coordinator'),
+    ItemKey::SOURCE_CAREMGMT => xl('Billing practitioner'),
 ];
 $priorityBadges = [
     WorkItem::PRIORITY_CRITICAL => ['badge-danger', xl('Critical')],

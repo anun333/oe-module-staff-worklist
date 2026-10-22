@@ -52,6 +52,14 @@ final class ItemKeyTest extends TestCase
         self::assertNotNull(ItemKey::parse('social:3:qr-41'), 'or from a questionnaire response');
     }
 
+    public function testACareManagementMonthIsTheEnrollmentThenTheMonth(): void
+    {
+        $key = ItemKey::parse('caremgmt:9001:12202609');
+        $this->assertNotNull($key);
+        $this->assertSame(['caremgmt', 9001, '12202609'], [$key->source, $key->pid, $key->ref]);
+        $this->assertNull(ItemKey::parse('caremgmt:9001:12202609.1'), 'a dotted ref is screening only');
+    }
+
     public function testConstructorRejectsADottedRefOutsideScreening(): void
     {
         $this->expectException(\InvalidArgumentException::class);

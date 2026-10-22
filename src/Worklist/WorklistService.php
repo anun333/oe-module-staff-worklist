@@ -25,6 +25,7 @@ use OpenHealthcare\StaffWorklist\Repository\StateRepository;
 use OpenHealthcare\StaffWorklist\Repository\UpcomingVisits;
 use OpenHealthcare\StaffWorklist\Repository\UserDirectory;
 use OpenHealthcare\StaffWorklist\Source\CareGapsSource;
+use OpenHealthcare\StaffWorklist\Source\CareManagementUnbilledSource;
 use OpenHealthcare\StaffWorklist\Source\ClaimsFollowUpSource;
 use OpenHealthcare\StaffWorklist\Source\OrdersMissingResultsSource;
 use OpenHealthcare\StaffWorklist\Source\ReferralsAwaitingReplySource;
@@ -100,6 +101,11 @@ final class WorklistService
             $sources[] = new PriorAuthorizationSource($now);
         }
         // Social needs, for users OpenEMR's SDOH history admits (history_sdoh.php: patients/med, write or add-only).
+        // Care management months met but not billed, when that module is installed and enabled, for users who
+        // may see billing: the check the Care Management month list makes before showing what was billed.
+        if (AclMain::aclCheckCore('acct', 'bill') && CareManagementUnbilledSource::available()) {
+            $sources[] = new CareManagementUnbilledSource($now);
+        }
         if (AclMain::aclCheckCore('patients', 'med', '', ['write', 'addonly'])) {
             $sources[] = new SocialNeedsSource($now);
         }

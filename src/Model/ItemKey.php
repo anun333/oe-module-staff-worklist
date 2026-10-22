@@ -32,8 +32,9 @@ final class ItemKey
     public const SOURCE_SLIDING = 'sliding';
     public const SOURCE_AUTH = 'auth';
     public const SOURCE_SOCIAL = 'social';
+    public const SOURCE_CAREMGMT = 'caremgmt';
 
-    private const PATTERN = '/^(result|order|referral|caregap|screen|claim|sliding|auth|social):([1-9]\d{0,17}):((?:(phq9|gad7|sdoh|qr)-)?[1-9]\d{0,17}(?:\.[1-9])?)$/D';
+    private const PATTERN = '/^(result|order|referral|caregap|screen|claim|sliding|auth|social|caremgmt):([1-9]\d{0,17}):((?:(phq9|gad7|sdoh|qr)-)?[1-9]\d{0,17}(?:\.[1-9])?)$/D';
 
     public function __construct(
         public readonly string $source,
