@@ -53,7 +53,7 @@ final class ScreeningFollowUpSource implements WorkSourceInterface
         // A Questionnaire carries an instrument through its total code or, as LOINC's own
         // PHQ-9 does with its total uncoded, its panel code.
         foreach ($instruments as $instrument) {
-            foreach (array_filter([$instrument->totalCode, $instrument->panelCode]) as $code) {
+            foreach ($instrument->carryingCodes() as $code) {
                 $mentions[] = 'COALESCE(NULLIF(qr.questionnaire, \'\'), rep.questionnaire) LIKE ?';
                 $binds[] = '%"' . $code . '"%';
             }
@@ -228,6 +228,10 @@ final class ScreeningFollowUpSource implements WorkSourceInterface
                 $facts[] = xl('Unanswered questions can only add points');
             }
             $facts[] = xl('Source') . ': ' . $instrument->source;
+            if ($instrument->isPart()) {
+                // Both of the PHQ-4's parts can be at their cut-off in one response.
+                $ref .= '.' . $instrument->keyDigit;
+            }
         }
         if ($finding->sexUnknown) {
             $facts[] = xl('Sex not recorded as male or female, so the cut-off for women was used');

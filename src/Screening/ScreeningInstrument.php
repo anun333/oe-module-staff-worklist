@@ -24,6 +24,14 @@ final class ScreeningInstrument
     public const PHQ9 = '44261-6';
     public const GAD7 = '70274-6';
     public const AUDITC = '75626-2';
+    /**
+     * The PHQ-4's two parts, each followed up on its own as its authors score them. LOINC codes the
+     * PHQ-4's total (70272-0) but not its parts, and has no GAD-2 total, so these keys are the module's.
+     */
+    public const PHQ4_DEPRESSION = 'phq-4-depression';
+    public const PHQ4_ANXIETY = 'phq-4-anxiety';
+    private const PHQ4_PANEL = '69724-3';
+    private const PHQ4_SOURCE = 'Kroenke K, Spitzer RL, Williams JBW, Löwe B. Psychosomatics. 2009;50(6):613-621. PMID 19996233';
 
     // ICD-10 codes, as prefixes, for a problem or visit diagnosis of the condition screened for.
     private const DEPRESSION = ['ICD10' => ['F32', 'F33', 'F34.1']];
@@ -34,7 +42,7 @@ final class ScreeningInstrument
 
     /**
      * @param string                       $name        the instrument's usual name
-     * @param string                       $totalCode   LOINC code of its total score item
+     * @param string                       $totalCode   LOINC code of its total score item, or for a part LOINC doesn't code (the PHQ-4's) a key of the module's
      * @param int                          $cutoff      listed at or above this total
      * @param int|null                     $womenCutoff a lower cut-off the paper gives for women (AUDIT-C)
      * @param string                       $meaning     what the paper says the cut-off means, untranslated
@@ -133,12 +141,61 @@ final class ScreeningInstrument
                 questions: ['68518-0' => 4, '68519-8' => 4, '68520-6' => 4],
                 keyDigit: 4,
             ),
+            // The PHQ-4 is the GAD-2 and the PHQ-2 together; a Questionnaire with its panel code carries both parts.
+            new self(
+                'PHQ-4 depression (PHQ-2)',
+                self::PHQ4_DEPRESSION,
+                3,
+                null,
+                "the cut-point the PHQ-4's authors recommend for each part; the PHQ-9 follows",
+                self::PHQ4_SOURCE,
+                null,
+                self::PHQ9,
+                self::DEPRESSION,
+                panelCode: self::PHQ4_PANEL,
+                questions: self::PHQ2_QUESTIONS,
+                keyDigit: 5,
+            ),
+            new self(
+                'PHQ-4 anxiety (GAD-2)',
+                self::PHQ4_ANXIETY,
+                3,
+                null,
+                "the cut-point the PHQ-4's authors recommend for each part; the GAD-7 follows",
+                self::PHQ4_SOURCE,
+                null,
+                self::GAD7,
+                ['ICD10' => ['F41']],
+                panelCode: self::PHQ4_PANEL,
+                // The GAD-7's first two questions.
+                questions: ['69725-0' => 3, '68509-9' => 3],
+                keyDigit: 6,
+            ),
         ];
         $byCode = [];
         foreach ($list as $instrument) {
             $byCode[$instrument->totalCode] = $instrument;
         }
         return $byCode;
+    }
+
+    /**
+     * The codes that mark a Questionnaire as carrying this instrument: its total's, when LOINC's, and its panel's.
+     *
+     * @return list<string>
+     */
+    public function carryingCodes(): array
+    {
+        return array_values(array_filter([$this->totalCode, $this->panelCode], static fn(string $c): bool => preg_match('/^\d{1,7}-\d$/', $c) === 1));
+    }
+
+    /**
+     * Whether this is a part of another instrument (the PHQ-4's), with no LOINC total of its own: its
+     * questionnaire carries the other part too, so a row's key names the part.
+     */
+    public function isPart(): bool
+    {
+        return !in_array($this->totalCode, $this->carryingCodes(), true);
     }
 
     /**

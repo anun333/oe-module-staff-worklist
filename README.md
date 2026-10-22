@@ -10,7 +10,7 @@ One queue of outstanding staff work across all patients, so nobody has to check 
 | No result yet | An order has no final result after 7 days (1 day for stat, ASAP, urgent or high) | A result arrives, or the order is completed or cancelled | Ordering provider |
 | Referral replies | An outgoing referral has no **Reply Date** after 14 days | Someone enters the reply date on the referral | Referring provider |
 | Care gaps, upcoming visits | A patient with a visit in the next 2 days has clinical reminders due | The visit passes or is cancelled, or the reminders are met | Visit provider |
-| Screening follow-up | A patient's latest PHQ-2, PHQ-9, GAD-7 or AUDIT-C from the last 180 days is at or above the instrument's published cut-off, or is unfinished and could still reach it | Something is coded after it: a later response, a problem or visit diagnosis for the condition, or a brief intervention for alcohol. See [Screening follow-up](#screening-follow-up) | Visit provider, else the patient's provider |
+| Screening follow-up | A patient's latest PHQ-2, PHQ-4 (each part), PHQ-9, GAD-7 or AUDIT-C from the last 180 days is at or above the instrument's published cut-off, or is unfinished and could still reach it | Something is coded after it: a later response, a problem or visit diagnosis for the condition, or a brief intervention for alcohol. See [Screening follow-up](#screening-follow-up) | Visit provider, else the patient's provider |
 | Claims follow-up | A claim was denied (OpenEMR records it and posts nothing), had a line written off with a denial reason, was billed to an insurer more than 45 days ago with nothing posted since, had a remittance posted that left its insurance open, or has a line flagged for follow-up in payment posting. See [Claims follow-up](#claims-follow-up) | The claim is billed again or its insurance level is closed, something is posted at that level, or the flag is unticked; a write-off stays until dismissed | Nobody: billing staff take them from Unassigned |
 | Sliding fee re-assessments | With the [Sliding Fee Discount](https://github.com/anun333/oe-module-sliding-fee) module installed: a patient seen in the last 12 months whose assessment runs out within 30 days, has run out, or who was never assessed | A new assessment is recorded | Nobody: the front desk takes them from Unassigned |
 | Social needs follow-up | A patient's latest social needs screen of a kind, from the last 180 days, is positive: OpenEMR's SDOH history, a Hunger Vital Sign, or a six-item food security survey (raw score 2 or more). Interpersonal safety is High. See [Social needs follow-up](#social-needs-follow-up) | A referral on or after the screen; for food, housing and financial strain, a service UDS Table 6A Lines 40 to 42 count, billed on or after it; or a later negative screen of the same kind | Nobody: a care coordinator takes them from Unassigned |
@@ -103,6 +103,10 @@ This needs no rule for missing answers. The PHQ instruction manual gives none (c
 | PHQ-9 | 44261-6 | 10 or more (severe from 20) | Kroenke 2001, PMID 11556941 | a depression problem or visit diagnosis (ICD-10 F32, F33, F34.1) |
 | GAD-7 | 70274-6 | 10 or more (severe from 15) | Spitzer 2006, PMID 16717171 | an anxiety problem or visit diagnosis (ICD-10 F41) |
 | AUDIT-C | 75626-2 | 4 or more for men, 3 or more for women | Bradley 2007, PMID 17451397 | an alcohol problem or visit diagnosis (ICD-10 F10, Z71.41), or a brief intervention billed (CPT 99408, 99409; HCPCS G0443) |
+| PHQ-4 depression (its PHQ-2) | from its two questions, 44250-9 and 44255-8 | 3 or more | Kroenke 2009, PMID 19996233 | what clears a PHQ-2 |
+| PHQ-4 anxiety (its GAD-2) | from its two questions, 69725-0 and 68509-9 | 3 or more | Kroenke 2009, PMID 19996233 | a GAD-7 response, or what clears a GAD-7 |
+
+The PHQ-4 (0.8.0) is followed up as its authors score it: each part on its own, at 3 or more. LOINC codes the PHQ-4's total (70272-0) but not its parts, and has no GAD-2 total, so each part is scored from its own two coded questions in a questionnaire with the PHQ-4's panel code (69724-3), as Clinic Forms' PHQ-4 has. Both parts at their cut-off make two rows, each keyed by its part.
 
 - **A later response** to the same instrument always replaces an earlier one, so a re-screen under the cut-off clears it.
 - **A problem already on the list** for the condition clears it too: the clinician already knows.
@@ -254,7 +258,7 @@ The unit tests need no database or OpenEMR install. CI runs them, and the footpr
 - Sensitivity masking applies to results, orders and screening responses filled in at a visit. Referrals, care gaps and responses filled in outside a visit aren't tied to a visit, so they have no sensitivity to apply.
 - Screening follow-up counts responses whatever their status, because OpenEMR's questionnaire runtime saves them all as `in-progress`.
 - Screening follow-up can't see follow-up written only in a note, or a referral made for it (a referral's reason is free text). Dismiss the item with a reason.
-- The PHQ-4 isn't read, because Clinic Forms' PHQ-4 has no total.
+- The PHQ-4's 0 to 12 total isn't followed up on its own: its authors give it no cut-off for screening, only one for each part.
 - Claims follow-up shows how long ago a claim was denied rather than an appeal deadline, since those differ by payer. On 8.4.1 and later, a line OpenEMR refused to post is found only through the insurance it left open; the remittance itself names the line.
 - At most 300 rows are shown at once, most urgent first.
 

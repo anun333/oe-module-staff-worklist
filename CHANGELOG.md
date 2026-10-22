@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0 (unreleased)
+
+- **The PHQ-4, each part on its own.** Screening follow-up reads a PHQ-4's depression part (its PHQ-2) and anxiety part (its GAD-2), each at 3 or more, as its authors score it (Kroenke 2009, PMID 19996233). A later PHQ-9 clears the depression part, and a later GAD-7 the anxiety part. Each is scored from its own two LOINC-coded questions, in a questionnaire with the PHQ-4's panel code (69724-3), as Clinic Forms' PHQ-4 has. LOINC has no code for the parts' totals.
+  - Both parts at their cut-off make two rows, each keyed by its part. Other instruments' row keys don't change.
+  - Checked with Clinic Forms' own exported PHQ-4 on OpenEMR 8.4.1 and master a10ebfa8d3.
+
 ## 0.7.0 (2026-10-20)
 
 - **New tab: Social needs follow-up.** A patient's latest positive social needs screen of a kind from the last 180 days, with nothing after it.

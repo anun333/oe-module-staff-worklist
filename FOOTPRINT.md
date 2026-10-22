@@ -118,8 +118,8 @@ As written in the source; whether they behave correctly for a given user is not 
 
 | part | files | lines |
 |---|---|---|
-| PHP logic (`src/`) | 45 | 4488 |
-| tests (`tests/`, `phpunit.xml.dist`) | 16 | 1562 |
+| PHP logic (`src/`) | 45 | 4549 |
+| tests (`tests/`, `phpunit.xml.dist`) | 16 | 1611 |
 | pages (`public/`) | 4 | 839 |
 | tools (`tools/`) | 2 | 670 |
 | module wiring | 5 | 145 |

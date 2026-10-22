@@ -62,6 +62,33 @@ final class ResponseScoringTest extends TestCase
         $this->assertSame([ScreeningInstrument::PHQ9], array_keys($this->read($this->questionnaire(), $this->response([3, 3, 0, 0, 0, 0, 0, 0, 0]))));
     }
 
+    public function testAPhq4IsReadAsItsTwoPartsAndNotAsAPhq2(): void
+    {
+        // Shaped like Clinic Forms' PHQ-4: its panel code, the GAD-2's two questions then the PHQ-2's, a coded total.
+        $codes = ['69725-0', '68509-9', '44250-9', '44255-8'];
+        $questions = [];
+        foreach ($codes as $code) {
+            $options = [];
+            foreach (array_keys(self::ANSWERS) as $points => $answer) {
+                $options[] = ['valueCoding' => ['system' => 'http://loinc.org', 'code' => $answer, 'extension' => [['url' => self::ORDINAL, 'valueDecimal' => $points]]]];
+            }
+            $questions[] = ['linkId' => '/' . $code, 'code' => [['system' => 'http://loinc.org', 'code' => $code]], 'type' => 'choice', 'answerOption' => $options];
+        }
+        $questions[] = ['linkId' => 'b2.total', 'code' => [['system' => 'http://loinc.org', 'code' => '70272-0']], 'type' => 'decimal', 'readOnly' => true];
+        $questionnaire = ['resourceType' => 'Questionnaire', 'code' => [['system' => 'http://loinc.org', 'code' => '69724-3']], 'item' => [['linkId' => 'b2', 'type' => 'group', 'item' => $questions]]];
+        $answerCodes = array_keys(self::ANSWERS);
+        $answer = static fn(string $code, int $points): array => ['linkId' => '/' . $code, 'answer' => [['valueCoding' => ['system' => 'http://loinc.org', 'code' => $answerCodes[$points]]]]];
+        $response = ['resourceType' => 'QuestionnaireResponse', 'item' => [['linkId' => 'b2', 'item' => [
+            $answer('69725-0', 2), $answer('68509-9', 2), $answer('44250-9', 0), $answer('44255-8', 1),
+        ]]]];
+
+        $scores = $this->read($questionnaire, $response);
+
+        $this->assertEqualsCanonicalizing([ScreeningInstrument::PHQ4_DEPRESSION, ScreeningInstrument::PHQ4_ANXIETY], array_keys($scores));
+        $this->assertEquals(new InstrumentScore(4, 4, 2, 2), $scores[ScreeningInstrument::PHQ4_ANXIETY]);
+        $this->assertEquals(new InstrumentScore(1, 1, 2, 2), $scores[ScreeningInstrument::PHQ4_DEPRESSION]);
+    }
+
     public function testWhenTheQuestionsArentCodedTheSavedTotalIsRead(): void
     {
         $questionnaire = $this->questionnaire();

@@ -88,6 +88,26 @@ final class ScreeningRulesTest extends TestCase
         $this->assertSame([2 => 'PHQ-2'], self::byPid($found, static fn(ScreenFinding $f): string => $f->instrument->name));
     }
 
+    public function testEachPartOfAPhq4IsFollowedUpOnItsOwnAndClearedByItsLongerScreen(): void
+    {
+        $responses = [
+            // Anxiety 3 and depression 2: the anxiety part is at its cut-off, the depression part not.
+            self::response(1, 1, '2026-10-01', [ScreeningInstrument::PHQ4_ANXIETY => 3, ScreeningInstrument::PHQ4_DEPRESSION => 2]),
+            // Both at 4, then a GAD-7 the next day: only the depression part is left.
+            self::response(2, 2, '2026-10-01', [ScreeningInstrument::PHQ4_ANXIETY => 4, ScreeningInstrument::PHQ4_DEPRESSION => 4]),
+            self::response(3, 2, '2026-10-02', [ScreeningInstrument::GAD7 => 6]),
+            // Depression 5, then a PHQ-9: nothing left.
+            self::response(4, 3, '2026-10-01', [ScreeningInstrument::PHQ4_DEPRESSION => 5]),
+            self::response(5, 3, '2026-10-03', [ScreeningInstrument::PHQ9 => 9]),
+        ];
+
+        $found = $this->rules()->findings($responses, [], []);
+        $names = array_map(static fn(ScreenFinding $f): string => $f->response->pid . ' ' . $f->instrument->name, $found);
+        sort($names);
+
+        $this->assertSame(['1 PHQ-4 anxiety (GAD-2)', '2 PHQ-4 depression (PHQ-2)'], $names);
+    }
+
     public function testAProblemOrVisitCodeForTheConditionClearsIt(): void
     {
         $responses = [];
@@ -239,11 +259,13 @@ final class ScreeningRulesTest extends TestCase
             $this->assertMatchesRegularExpression('/^\d{4,5}-\d$/', $instrument->panelCode, $instrument->name);
             $digits[] = $instrument->keyDigit;
         }
-        $this->assertSame([1, 2, 3, 4], $digits);
+        $this->assertSame([1, 2, 3, 4, 5, 6], $digits);
         $this->assertSame(27, array_sum(ScreeningInstrument::all()[ScreeningInstrument::PHQ9]->questions));
         $this->assertSame(21, array_sum(ScreeningInstrument::all()[ScreeningInstrument::GAD7]->questions));
         $this->assertSame(12, array_sum(ScreeningInstrument::all()[ScreeningInstrument::AUDITC]->questions));
         $this->assertSame(6, array_sum(ScreeningInstrument::all()[ScreeningInstrument::PHQ2]->questions));
+        $this->assertSame(6, array_sum(ScreeningInstrument::all()[ScreeningInstrument::PHQ4_DEPRESSION]->questions));
+        $this->assertSame(6, array_sum(ScreeningInstrument::all()[ScreeningInstrument::PHQ4_ANXIETY]->questions));
     }
 
     public function testEveryInstrumentNamesItsSourceAndAPubmedId(): void
