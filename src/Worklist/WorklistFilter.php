@@ -23,7 +23,7 @@ final class WorklistFilter
     private const VIEWS = [ItemState::STATUS_OPEN, ItemState::STATUS_SNOOZED, ItemState::STATUS_DISMISSED];
     private const SCOPES = [self::SCOPE_MINE, self::SCOPE_UNASSIGNED, self::SCOPE_ALL];
     private const SOURCES = [
-        ItemKey::SOURCE_RESULT, ItemKey::SOURCE_ORDER, ItemKey::SOURCE_REFERRAL, ItemKey::SOURCE_CAREGAP, ItemKey::SOURCE_SCREEN, ItemKey::SOURCE_CLAIM, ItemKey::SOURCE_SLIDING, ItemKey::SOURCE_AUTH, ItemKey::SOURCE_SOCIAL, ItemKey::SOURCE_CAREMGMT,
+        ItemKey::SOURCE_RESULT, ItemKey::SOURCE_ORDER, ItemKey::SOURCE_REFERRAL, ItemKey::SOURCE_CAREGAP, ItemKey::SOURCE_SCREEN, ItemKey::SOURCE_CLAIM, ItemKey::SOURCE_SLIDING, ItemKey::SOURCE_AUTH, ItemKey::SOURCE_SOCIAL,
     ];
 
     /**
@@ -74,7 +74,8 @@ final class WorklistFilter
      *
      * @param array<string, mixed> $params
      */
-    public static function fromRequest(int $userId, array $params): self
+    /** @param list<string> $contributed other modules' sources (WorklistService::contributed()), also valid as ?source= */
+    public static function fromRequest(int $userId, array $params, array $contributed = []): self
     {
         $pick = static fn(string $name, array $allowed, ?string $default): ?string =>
             in_array($params[$name] ?? null, $allowed, true) ? $params[$name] : $default;
@@ -83,7 +84,7 @@ final class WorklistFilter
             $userId,
             $pick('view', self::VIEWS, ItemState::STATUS_OPEN),
             $pick('scope', self::SCOPES, self::SCOPE_MINE),
-            $pick('source', self::SOURCES, null),
+            $pick('source', array_merge(self::SOURCES, $contributed), null),
         );
     }
 }

@@ -32,9 +32,24 @@ final class ItemKey
     public const SOURCE_SLIDING = 'sliding';
     public const SOURCE_AUTH = 'auth';
     public const SOURCE_SOCIAL = 'social';
-    public const SOURCE_CAREMGMT = 'caremgmt';
 
-    private const PATTERN = '/^(result|order|referral|caregap|screen|claim|sliding|auth|social|caremgmt):([1-9]\d{0,17}):((?:(phq9|gad7|sdoh|qr)-)?[1-9]\d{0,17}(?:\.[1-9])?)$/D';
+    /** The worklist's own sources; another module's are added through Event\CollectSourcesEvent. */
+    public const BUILT_IN = ['result', 'order', 'referral', 'caregap', 'screen', 'claim', 'sliding', 'auth', 'social'];
+    /** What another module's source id may be. */
+    public const CONTRIBUTED_SOURCE = '/^[a-z][a-z0-9]{2,15}$/D';
+
+    /** @var array<string, true> sources other modules added for this request */
+    private static array $contributed = [];
+
+    private const PATTERN = '/^([a-z][a-z0-9]{2,15}):([1-9]\d{0,17}):((?:(phq9|gad7|sdoh|qr)-)?[1-9]\d{0,17}(?:\.[1-9])?)$/D';
+
+    /** Accepts another module's source in keys, for this request (WorklistService does it as the module adds it). */
+    public static function allow(string $source): void
+    {
+        if (preg_match(self::CONTRIBUTED_SOURCE, $source) === 1 && !in_array($source, self::BUILT_IN, true)) {
+            self::$contributed[$source] = true;
+        }
+    }
 
     public function __construct(
         public readonly string $source,
@@ -67,7 +82,8 @@ final class ItemKey
         return match ($m[1]) {
             self::SOURCE_SCREEN => in_array($prefix, ['', 'phq9', 'gad7'], true),
             self::SOURCE_SOCIAL => in_array($prefix, ['sdoh', 'qr'], true) && !str_contains($m[3], '.'),
-            default => $prefix === '' && !str_contains($m[3], '.'),
+            // Another module's source: only once it's been added, and with a plain ref.
+            default => (in_array($m[1], self::BUILT_IN, true) || isset(self::$contributed[$m[1]])) && $prefix === '' && !str_contains($m[3], '.'),
         };
     }
 

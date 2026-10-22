@@ -37,7 +37,8 @@ if (!AclMain::aclCheckCore('patients', 'med')) {
 $session = SessionWrapperFactory::getInstance()->getActiveSession();
 $userId = (int)$session->get('authUserID');
 $now = new DateTimeImmutable();
-$filter = WorklistFilter::fromRequest($userId, $_GET);
+$service = WorklistService::create($now);
+$filter = WorklistFilter::fromRequest($userId, $_GET, array_keys($service->contributed()));
 
 // Site selection: choosing sites (?sites=) saves the choice for this user; otherwise the saved one applies.
 // It only narrows the list. Which sites a user may see at all is decided by SiteAccess.
@@ -51,7 +52,6 @@ if ($requestedSites !== false) {
 }
 $filter = $filter->withSites($selectedSites);
 
-$service = WorklistService::create($now);
 $result = $service->build($filter, $now);
 $careGapStatus = $service->careGapStatus();
 $canAct = AclMain::aclCheckCore('patients', 'med', '', 'write');
@@ -68,8 +68,7 @@ $sourceLabels = [
     ItemKey::SOURCE_SLIDING => xl('Sliding fee re-assessments'),
     ItemKey::SOURCE_AUTH => xl('Prior authorizations'),
     ItemKey::SOURCE_SOCIAL => xl('Social needs follow-up'),
-    ItemKey::SOURCE_CAREMGMT => xl('Care management, not billed'),
-];
+] + array_map(static fn(array $c): string => $c['label'], $service->contributed());
 $sourceLabels = array_filter($sourceLabels, static fn(string $source): bool => $service->hasSource($source), ARRAY_FILTER_USE_KEY);
 $viewLabels = [
     ItemState::STATUS_OPEN => xl('Open'),
@@ -92,8 +91,7 @@ $ownerRoles = [
     ItemKey::SOURCE_SLIDING => xl('Front desk'),
     ItemKey::SOURCE_AUTH => xl('Front desk'),
     ItemKey::SOURCE_SOCIAL => xl('Care coordinator'),
-    ItemKey::SOURCE_CAREMGMT => xl('Billing practitioner'),
-];
+] + array_map(static fn(array $c): string => $c['ownerRole'], $service->contributed());
 $priorityBadges = [
     WorkItem::PRIORITY_CRITICAL => ['badge-danger', xl('Critical')],
     WorkItem::PRIORITY_HIGH => ['badge-warning', xl('High')],

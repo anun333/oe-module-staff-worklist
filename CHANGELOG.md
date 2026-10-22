@@ -5,12 +5,10 @@
 - **The PHQ-4, each part on its own.** Screening follow-up reads a PHQ-4's depression part (its PHQ-2) and anxiety part (its GAD-2), each at 3 or more, as its authors score it (Kroenke 2009, PMID 19996233). A later PHQ-9 clears the depression part, and a later GAD-7 the anxiety part. Each is scored from its own two LOINC-coded questions, in a questionnaire with the PHQ-4's panel code (69724-3), as Clinic Forms' PHQ-4 has. LOINC has no code for the parts' totals.
   - Both parts at their cut-off make two rows, each keyed by its part. Other instruments' row keys don't change.
   - Checked with Clinic Forms' own exported PHQ-4 on OpenEMR 8.4.1 and master a10ebfa8d3.
-- **New tab: Care management, not billed.** With the Care Management module installed (0.3.2 or later), it lists an enrollment whose month, in the last three completed months, met a code with nothing billed for its service.
-  - **Same reading as the module:** months are read through Care Management's own `MonthLines`, so the tab and its month list agree.
-  - **Rows:** the minutes, the codes met by each route, and the billing practitioner, who owns the row. The button opens the month list for that month.
-  - **Clears** when the month is billed, or when it's dismissed for a month the clinic decides not to bill.
-  - **Access:** shown to users who may see billing (`acct/bill`), as the month list requires.
-  - **Checked** within Care Management's end-to-end check, on 8.4.1 and master: 9301's September, met and not billed, is listed. A billed month and one still running aren't.
+- **Other modules can add a tab.** As the worklist is put together it asks OpenEMR's event dispatcher (`staff_worklist.collect_sources`, `Event\CollectSourcesEvent`) whether another module adds a work source, with its label and the role that owns its rows.
+  - **Who sees it:** the module decides, by adding its source only for users it admits.
+  - **Row keys:** a contributed source's keys are accepted once it's added, and its id can't take one of the worklist's own.
+  - **Care Management 0.3.2 adds "Care management, not billed" this way:** an enrollment whose month, in the last three completed months, met a code with nothing billed. It's read through Care Management's own month list, so the two agree. It's for users who may see billing (`acct/bill`), and is checked within Care Management's end-to-end check on 8.4.1 and master.
 - **Not done: a decision clock for pending prior authorizations.** CMS-0057-F's 72-hour and 7-day clocks need a request's date, urgency and status. OpenEMR's Prior Authorizations module records only granted authorizations (number, dates, codes, units), so there's nothing to time.
 
 ## 0.7.0 (2026-10-20)

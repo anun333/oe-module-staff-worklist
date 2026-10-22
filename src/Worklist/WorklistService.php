@@ -14,6 +14,7 @@ namespace OpenHealthcare\StaffWorklist\Worklist;
 use OpenEMR\Common\Acl\AclMain;
 use OpenEMR\Core\OEGlobalsBag;
 use OpenHealthcare\StaffWorklist\CareGaps\CareGapCache;
+use OpenHealthcare\StaffWorklist\Event\CollectSourcesEvent;
 use OpenHealthcare\StaffWorklist\Model\ItemKey;
 use OpenHealthcare\StaffWorklist\Model\ItemState;
 use OpenHealthcare\StaffWorklist\Model\WorkItem;
@@ -25,7 +26,6 @@ use OpenHealthcare\StaffWorklist\Repository\StateRepository;
 use OpenHealthcare\StaffWorklist\Repository\UpcomingVisits;
 use OpenHealthcare\StaffWorklist\Repository\UserDirectory;
 use OpenHealthcare\StaffWorklist\Source\CareGapsSource;
-use OpenHealthcare\StaffWorklist\Source\CareManagementUnbilledSource;
 use OpenHealthcare\StaffWorklist\Source\ClaimsFollowUpSource;
 use OpenHealthcare\StaffWorklist\Source\OrdersMissingResultsSource;
 use OpenHealthcare\StaffWorklist\Source\ReferralsAwaitingReplySource;
@@ -49,6 +49,9 @@ final class WorklistService
 
     /** @var array<string, WorkSourceInterface> */
     private readonly array $sources;
+
+    /** @var array<string, array{label: string, ownerRole: string}> */
+    private array $contributed = [];
 
     /**
      * @param WorkSourceInterface[] $sources
@@ -101,15 +104,22 @@ final class WorklistService
             $sources[] = new PriorAuthorizationSource($now);
         }
         // Social needs, for users OpenEMR's SDOH history admits (history_sdoh.php: patients/med, write or add-only).
-        // Care management months met but not billed, when that module is installed and enabled, for users who
-        // may see billing: the check the Care Management month list makes before showing what was billed.
-        if (AclMain::aclCheckCore('acct', 'bill') && CareManagementUnbilledSource::available()) {
-            $sources[] = new CareManagementUnbilledSource($now);
-        }
         if (AclMain::aclCheckCore('patients', 'med', '', ['write', 'addonly'])) {
             $sources[] = new SocialNeedsSource($now);
         }
-        return new self(
+        // Other modules' tabs: each module decides whether this user gets its tab.
+        $event = new CollectSourcesEvent($now);
+        $kernel = OEGlobalsBag::getInstance()->getKernel();
+        if (is_object($kernel) && method_exists($kernel, 'getEventDispatcher')) {
+            $kernel->getEventDispatcher()->dispatch($event, CollectSourcesEvent::EVENT_NAME);
+        }
+        $contributed = [];
+        foreach ($event->added() as $id => $added) {
+            ItemKey::allow($id);
+            $sources[] = $added['source'];
+            $contributed[$id] = ['label' => $added['label'], 'ownerRole' => $added['ownerRole']];
+        }
+        $service = new self(
             $sources,
             new StateRepository(),
             new WorklistAssembler(),
@@ -118,6 +128,18 @@ final class WorklistService
             new SiteDirectory(),
             $policy,
         );
+        $service->contributed = $contributed;
+        return $service;
+    }
+
+    /**
+     * Other modules' tabs this user has, by source id: the label and the owner role each gave.
+     *
+     * @return array<string, array{label: string, ownerRole: string}>
+     */
+    public function contributed(): array
+    {
+        return $this->contributed;
     }
 
     public function build(WorklistFilter $filter, \DateTimeImmutable $today): WorklistResult

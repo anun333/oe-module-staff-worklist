@@ -52,12 +52,16 @@ final class ItemKeyTest extends TestCase
         self::assertNotNull(ItemKey::parse('social:3:qr-41'), 'or from a questionnaire response');
     }
 
-    public function testACareManagementMonthIsTheEnrollmentThenTheMonth(): void
+    public function testAnotherModulesSourceIsAKeyOnlyOnceItsBeenAdded(): void
     {
-        $key = ItemKey::parse('caremgmt:9001:12202609');
+        $this->assertNull(ItemKey::parse('caremgmtx:9001:12202609'), 'not yet added');
+        ItemKey::allow('caremgmtx');
+        $key = ItemKey::parse('caremgmtx:9001:12202609');
         $this->assertNotNull($key);
-        $this->assertSame(['caremgmt', 9001, '12202609'], [$key->source, $key->pid, $key->ref]);
-        $this->assertNull(ItemKey::parse('caremgmt:9001:12202609.1'), 'a dotted ref is screening only');
+        $this->assertSame(['caremgmtx', 9001, '12202609'], [$key->source, $key->pid, $key->ref]);
+        $this->assertNull(ItemKey::parse('caremgmtx:9001:12202609.1'), 'a dotted ref is screening only');
+        ItemKey::allow('Bad-Id');
+        $this->assertNull(ItemKey::parse('Bad-Id:9001:1'), 'an id outside the pattern is never allowed');
     }
 
     public function testConstructorRejectsADottedRefOutsideScreening(): void
