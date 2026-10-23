@@ -119,10 +119,10 @@ As written in the source; whether they behave correctly for a given user is not 
 | part | files | lines |
 |---|---|---|
 | PHP logic (`src/`) | 46 | 4654 |
-| tests (`tests/`, `phpunit.xml.dist`) | 17 | 1688 |
+| tests (`tests/`, `phpunit.xml.dist`) | 17 | 1666 |
 | pages (`public/`) | 4 | 839 |
 | tools (`tools/`) | 2 | 670 |
-| module wiring | 5 | 151 |
+| module wiring | 5 | 152 |
 | install SQL (`sql/`) | 1 | 57 |
 | background job (`background/`) | 1 | 26 |
 
