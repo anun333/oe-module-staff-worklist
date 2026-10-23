@@ -187,7 +187,8 @@ if ($service->sites->isRestrictionEnabled()) {
 }
 ?>
 <!DOCTYPE html>
-<html>
+<?php // The module's own text is written in English. ?>
+<html lang="en">
 <head>
     <title><?php echo xlt('Worklist'); ?></title>
     <?php Header::setupHeader(['common']); ?>

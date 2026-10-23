@@ -120,7 +120,7 @@ As written in the source; whether they behave correctly for a given user is not 
 |---|---|---|
 | PHP logic (`src/`) | 46 | 4654 |
 | tests (`tests/`, `phpunit.xml.dist`) | 17 | 1666 |
-| pages (`public/`) | 4 | 839 |
+| pages (`public/`) | 4 | 840 |
 | tools (`tools/`) | 2 | 670 |
 | module wiring | 5 | 152 |
 | install SQL (`sql/`) | 1 | 57 |
