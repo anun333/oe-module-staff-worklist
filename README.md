@@ -221,6 +221,8 @@ The same six are worth repeating in your own install, with your own groups and f
 
 ## Compatibility
 
+**Older OpenEMR:** on 7.0.3 and older (no `OEGlobalsBag`), the module stays switched off rather than stop OpenEMR's pages; it hasn't been tested from 7.0.4 to 8.3. Checked on a fresh 7.0.2 install with every module enabled (`dev/module_compat_check.sh`).
+
 Tested with synthetic data on:
 
 | OpenEMR | install by Composer and Module Manager | queues | access |

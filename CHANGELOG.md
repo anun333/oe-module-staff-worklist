@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.1 (unreleased)
+
+- **No longer stops an older OpenEMR.** OpenEMR loads a module's bootstrap on every request, the login page included. This module's used `OEGlobalsBag`, which came with OpenEMR 7.0.4 and 8.0, so on 7.0.3 or older, enabling it made every page fail (HTTP 500), login included, until the module was switched off in the database. It now stays switched off there instead. Found by the nightly matrix's new fresh 7.0.2 install (`dev/module_compat_check.sh`).
+
 ## 0.8.0 (2026-10-22)
 
 - **The PHQ-4, each part on its own.** Screening follow-up reads a PHQ-4's depression part (its PHQ-2) and anxiety part (its GAD-2), each at 3 or more, as its authors score it (Kroenke 2009, PMID 19996233). A later PHQ-9 clears the depression part, and a later GAD-7 the anxiety part. Each is scored from its own two LOINC-coded questions, in a questionnaire with the PHQ-4's panel code (69724-3), as Clinic Forms' PHQ-4 has. LOINC has no code for the parts' totals.
