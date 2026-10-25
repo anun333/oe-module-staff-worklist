@@ -4,6 +4,8 @@ One queue of outstanding staff work across all patients, so nobody has to check 
 
 **Status: 0.8.2, a pre-release.** Tested on OpenEMR with synthetic data only, access checks included (see [Compatibility](#compatibility)). It lists many patients' work on one page, so read [Access](#access) and [FOOTPRINT.md](FOOTPRINT.md) before installing, and try it with your own users and settings before giving staff access.
 
+Using the module day to day, tab by tab for each role: see [GUIDE.md](GUIDE.md).
+
 | Tab | Listed when | Leaves the list when | Default owner |
 |---|---|---|---|
 | Results to sign | A result was received and nobody has signed it | A clinician signs it (Procedures › results › **Sign Results**) | Ordering provider |
