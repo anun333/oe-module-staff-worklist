@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.5 (unreleased)
+
+- **Claim files that never reached the clearinghouse are listed.** With OpenEMR's "Auto SFTP claims to X12 partner" on, each batch file is queued for upload and its outcome recorded in core's `x12_remote_tracker`. The **Claims follow-up** tab now lists a billed claim whose latest upload failed (the partner's settings, the local file, the login, the remote folder, or from OpenEMR 8.5.0 the upload itself), **High**, ahead of "no response", which it explains; and one whose file has been waiting, or stuck mid-upload, for more than a day, which usually means the SFTP background service isn't running. A later successful upload of the claim clears it. The row shows the status, file and first error, and its button opens OpenEMR's Claim File Tracker. Before 8.5.0 a failed upload itself was recorded as sent (openemr/openemr#14336), so there only the earlier failures show.
+- **Multisite on OpenEMR 8.2 to 8.4:** there a background service for a site other than `default` ran against the default site (openemr/openemr#14359, fixed in 8.5.0), so this module's care gaps job never refreshed another site's patients. The care gaps strip now says so on such a site when its checks are more than a day behind, and points to **Check now**; the README and the staff guide explain it.
+- **Checked:** unit tests on PHP 8.4 (167; 12 new, 11 of which fail on 0.8.4's code); the claims tab's end-to-end check on OpenEMR 8.4.1 with synthetic tracker rows (a failed login for two claims, a later successful resend of one, a file waiting 30 hours), whose six new steps fail on 0.8.4 and pass here.
+
 ## 0.8.4 (2026-10-26)
 
 - **Text and buttons are easier to read on this module's pages.** OpenEMR's blue (#007bff) is 3.97:1 on white, under the 4.5:1 that WCAG 2.1 AA asks of normal text and that HHS's Section 504 rule requires from 2027-05-11. Under OpenEMR's light and manila themes, the module's links and primary buttons now use #0056b3 (7.0:1), and muted and warning text darker shades that stay readable on tinted rows, and a link inside text is underlined; the dark, solar and colour themes keep their own colours, and OpenEMR's own pages are unchanged.

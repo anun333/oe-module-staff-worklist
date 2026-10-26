@@ -7,6 +7,10 @@
  *  - written off: a remittance adjusted a line off, paying nothing for it, with a reason
  *    other than the contractual 45 or 59. OpenEMR before 8.4.1 posted such a line denial as an
  *    "Adjust code" adjustment; since #11868 (in 8.4.1) it refuses to post it, as here;
+ *  - not sent: the claim file OpenEMR queued for its SFTP upload to an X12 partner failed
+ *    (settings, the local file, login, the remote folder, or from 8.5.0 the upload itself), so
+ *    the insurer never got it; or it is still queued long after, which means the upload
+ *    service isn't running. Each comes before "no response", which it explains;
  *  - no response: billed to an insurer longer ago than the policy allows, with nothing
  *    posted at that level since and the level open;
  *  - partly posted: a remittance posted to the claim and its level is still open long after.
@@ -36,6 +40,8 @@ final class ClaimRules
     public const FLAGGED = 'flagged';
     public const WRITTEN_OFF = 'written_off';
     public const PARTLY_POSTED = 'partly_posted';
+    public const UPLOAD_FAILED = 'upload_failed';
+    public const NOT_SENT = 'not_sent';
     /** Adjustment reasons OpenEMR treats as contractual write-offs (CO-45, CO-59) when a line is paid nothing. */
     public const CONTRACTUAL = ['45', '59'];
 
@@ -69,6 +75,15 @@ final class ClaimRules
         if ($claim->writeOffs !== [] && $claim->versionTime !== null && $claim->versionTime >= $this->windowStart()) {
             $since = min(array_map(static fn(array $w): \DateTimeImmutable => $w['at'], $claim->writeOffs));
             return ['kind' => self::WRITTEN_OFF, 'priority' => WorkItem::PRIORITY_HIGH, 'since' => $since, 'flagged' => $flagged];
+        }
+        if ($open && $claim->status === ClaimRecord::STATUS_BILLED && $claim->upload !== null) {
+            $upload = $claim->upload;
+            if (ClaimUpload::failed($upload['status'])) {
+                return ['kind' => self::UPLOAD_FAILED, 'priority' => WorkItem::PRIORITY_HIGH, 'since' => $upload['at'], 'flagged' => $flagged];
+            }
+            if (ClaimUpload::pending($upload['status']) && PriorityPolicy::ageHours($upload['at'], $this->now) > $this->policy->claimNotSentHours) {
+                return ['kind' => self::NOT_SENT, 'priority' => WorkItem::PRIORITY_NORMAL, 'since' => $upload['at'], 'flagged' => $flagged];
+            }
         }
         if ($open && $claim->status === ClaimRecord::STATUS_BILLED) {
             $days = PriorityPolicy::ageDays($claim->versionTime, $this->now);

@@ -2,10 +2,10 @@
 
 /**
  * Claims that need billing staff (ClaimRules): denials OpenEMR recorded from a
- * remittance without posting anything, claims billed with no payer response, and
- * lines flagged for follow-up while posting. Read from claims, ar_activity and
- * form_encounter; the worklist only lists them, and the work is done in core's
- * posting page.
+ * remittance without posting anything, claim files its SFTP upload never sent, claims
+ * billed with no payer response, and lines flagged for follow-up while posting. Read from
+ * claims, ar_activity, x12_remote_tracker and form_encounter; the worklist only lists them,
+ * and the work is done in core's posting page or its Claim File Tracker.
  *
  * @package   OpenEMR
  * @link      https://www.open-emr.org
@@ -22,6 +22,7 @@ use OpenEMR\Billing\BillingUtilities;
 use OpenEMR\Common\Database\QueryUtils;
 use OpenHealthcare\StaffWorklist\Claims\ClaimRecord;
 use OpenHealthcare\StaffWorklist\Claims\ClaimRules;
+use OpenHealthcare\StaffWorklist\Claims\ClaimUpload;
 use OpenHealthcare\StaffWorklist\Model\ItemKey;
 use OpenHealthcare\StaffWorklist\Model\PatientRef;
 use OpenHealthcare\StaffWorklist\Model\WorkItem;
@@ -115,6 +116,7 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
                     'reason' => $reason, 'amount' => (float)$row['adj_amount'], 'at' => $at];
             }
         }
+        $uploads = self::uploads($since);
         $items = [];
         foreach ($rows as $key => $row) {
             $versionTime = self::date($row['bill_time'] ?? null);
@@ -137,6 +139,7 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
                 $flags[$key] ?? [],
                 self::date($row['last_posted'] ?? null),
                 $lines,
+                $uploads[$key] ?? null,
             );
             $decision = $this->rules->decide($claim);
             if ($decision !== null) {
@@ -159,6 +162,9 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
             ClaimRules::NO_RESPONSE => xl('No response from') . ' ' . $payer . ' ' . xl('in') . ' '
                 . PriorityPolicy::ageDays($decision['since'], $this->now) . ' ' . xl('days'),
             ClaimRules::WRITTEN_OFF => xl('Line written off with a denial reason by') . ' ' . $payer,
+            ClaimRules::UPLOAD_FAILED => xl('Claim file not sent to') . ' ' . self::partner($claim),
+            ClaimRules::NOT_SENT => xl('Claim file still waiting to be sent to') . ' ' . self::partner($claim) . ' ' . xl('after') . ' '
+                . PriorityPolicy::ageHours($decision['since'], $this->now) . ' ' . xl('hours'),
             ClaimRules::PARTLY_POSTED => xl('Remittance posted, insurance still open after') . ' '
                 . PriorityPolicy::ageDays($decision['since'], $this->now) . ' ' . xl('days'),
             default => xl('Flagged for follow-up'),
@@ -185,6 +191,21 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
         } elseif ($decision['kind'] === ClaimRules::PARTLY_POSTED) {
             $facts[] = xl('Last posted') . ' ' . oeFormatShortDate($decision['since']->format('Y-m-d'));
             $facts[] = xl('A line OpenEMR could not post stops the rest of the claim from posting and leaves the insurance open');
+        } elseif (in_array($decision['kind'], [ClaimRules::UPLOAD_FAILED, ClaimRules::NOT_SENT], true) && $claim->upload !== null) {
+            $upload = $claim->upload;
+            $facts[] = xl('Queued') . ' ' . oeFormatShortDate($upload['at']->format('Y-m-d'));
+            if ($decision['kind'] === ClaimRules::UPLOAD_FAILED) {
+                $facts[] = xl('Upload status') . ' ' . $upload['status'];
+            }
+            if ($upload['file'] !== '') {
+                $facts[] = xl('File') . ' ' . $upload['file'];
+            }
+            if ($upload['message'] !== '') {
+                $facts[] = $upload['message'];
+            }
+            if ($decision['kind'] === ClaimRules::NOT_SENT) {
+                $facts[] = xl('The SFTP background service may not be running');
+            }
         } elseif ($decision['kind'] === ClaimRules::NO_RESPONSE && $claim->versionTime !== null) {
             $facts[] = xl('Billed') . ' ' . oeFormatShortDate($claim->versionTime->format('Y-m-d'));
         }
@@ -192,6 +213,7 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
             $facts[] = xl('Flagged') . ' ' . oeFormatShortDate($flag['at']->format('Y-m-d')) . ($flag['note'] !== '' ? ': ' . $flag['note'] : '');
         }
 
+        $tracker = in_array($decision['kind'], [ClaimRules::UPLOAD_FAILED, ClaimRules::NOT_SENT], true);
         return new WorkItem(
             key: new ItemKey(ItemKey::SOURCE_CLAIM, $claim->pid, (string)$claim->encounter),
             patient: PatientRef::fromRow($claim->pid, $row, $this->now),
@@ -200,13 +222,43 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
             priority: $decision['priority'],
             since: $decision['since'],
             ownerId: null,
-            actionLabel: xl('Open posting'),
-            actionUrl: '/interface/billing/sl_eob_invoice.php?id=' . (int)$row['fe_id'],
+            actionLabel: $tracker ? xl('Open claim file tracker') : xl('Open posting'),
+            actionUrl: $tracker ? '/interface/billing/billing_tracker.php' : '/interface/billing/sl_eob_invoice.php?id=' . (int)$row['fe_id'],
             actionMode: 'window',
             dismissible: true,
             siteId: ((int)($row['site_id'] ?? 0)) ?: null,
             sensitivity: is_string($row['sensitivity'] ?? null) ? $row['sensitivity'] : null,
         );
+    }
+
+    /**
+     * The latest SFTP upload of each claim queued since the window started, keyed "pid:encounter".
+     * Empty when the site has no x12_remote_tracker table.
+     *
+     * @return array<string, array{status: string, at: \DateTimeImmutable, file: string, partner: string, message: string}>
+     */
+    private static function uploads(string $since): array
+    {
+        $exists = QueryUtils::fetchRecords(
+            'SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?',
+            ['x12_remote_tracker']
+        );
+        if ($exists === []) {
+            return [];
+        }
+        return ClaimUpload::latestByClaim(QueryUtils::fetchRecords(
+            "SELECT r.id, r.status, r.x12_filename, r.messages, r.claims, r.created_at, p.name AS partner_name
+            FROM x12_remote_tracker AS r
+            LEFT JOIN x12_partners AS p ON p.id = r.x12_partner_id
+            WHERE r.created_at >= ?",
+            [$since]
+        ));
+    }
+
+    private static function partner(ClaimRecord $claim): string
+    {
+        $name = $claim->upload['partner'] ?? '';
+        return $name !== '' ? $name : xl('the clearinghouse');
     }
 
     private static function date(mixed $value): ?\DateTimeImmutable

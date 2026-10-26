@@ -130,9 +130,56 @@ final class ClaimRulesTest extends TestCase
         array $flags = [],
         ?string $lastPosted = null,
         array $writeOffs = [],
+        ?array $upload = null,
     ): ClaimRecord {
         return new ClaimRecord(7, 70, $status, $level, 'Payer', $time === null ? null : new \DateTimeImmutable($time), '99213__CO_16', $lastLevelClosed, $postedSince, $flags,
-            $lastPosted === null ? null : new \DateTimeImmutable($lastPosted), $writeOffs);
+            $lastPosted === null ? null : new \DateTimeImmutable($lastPosted), $writeOffs, $upload);
+    }
+
+    /** @return array{status: string, at: \DateTimeImmutable, file: string, partner: string, message: string} */
+    private static function upload(string $status, string $at): array
+    {
+        return ['status' => $status, 'at' => new \DateTimeImmutable($at), 'file' => 'batch.txt', 'partner' => 'Clearinghouse', 'message' => ''];
+    }
+
+    public function testAFailedUploadIsHighPriorityAndComesBeforeNoResponse(): void
+    {
+        $rules = $this->rules();
+        foreach (['parameter-error', 'claim-file-error', 'login-error', 'chdir-error', 'upload-error'] as $status) {
+            $decision = $rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-10-17 09:00:00', upload: self::upload($status, '2026-10-17 09:00:05')));
+            $this->assertSame([ClaimRules::UPLOAD_FAILED, WorkItem::PRIORITY_HIGH], self::kindAndPriority($decision), $status);
+            $this->assertEquals(new \DateTimeImmutable('2026-10-17 09:00:05'), $decision['since']);
+        }
+        // Billed 60 days ago and never sent: the failure explains the silence, so it is what lists.
+        $this->assertSame(ClaimRules::UPLOAD_FAILED,
+            $rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-08-19', upload: self::upload('login-error', '2026-08-19')))['kind'] ?? null);
+    }
+
+    public function testAnUploadFailureLeavesWhenTheInsurerAnsweredTheLevelClosedOrTheYearPassed(): void
+    {
+        $rules = $this->rules();
+        $failed = self::upload('upload-error', '2026-10-01');
+        $this->assertNull($rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-10-01', postedSince: true, upload: $failed)), 'posted since');
+        $this->assertNull($rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-10-01', lastLevelClosed: 1, upload: $failed)), 'level closed');
+        $this->assertNull($rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2025-10-01', upload: $failed)), 'outside the year');
+        // A denial means the insurer had the claim: the denial lists, not the old upload.
+        $this->assertSame(ClaimRules::DENIED, $rules->decide(self::claim(ClaimRecord::STATUS_DENIED, '2026-10-01', upload: $failed))['kind'] ?? null);
+    }
+
+    public function testAFileStillQueuedAfterADayIsNotSentAndASentOneIsJustBilled(): void
+    {
+        $rules = $this->rules();
+        $this->assertSame([ClaimRules::NOT_SENT, WorkItem::PRIORITY_NORMAL],
+            self::kindAndPriority($rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-10-17 11:00:00', upload: self::upload('waiting', '2026-10-17 11:00:00')))), '25 hours');
+        $this->assertSame(ClaimRules::NOT_SENT,
+            $rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-10-17 11:00:00', upload: self::upload('in-progress', '2026-10-17 11:00:00')))['kind'] ?? null, 'stuck mid-upload');
+        $this->assertNull($rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-10-17 12:00:00', upload: self::upload('waiting', '2026-10-17 12:00:00'))), '24 hours: not yet');
+        $this->assertNull($rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-10-01', upload: self::upload('success', '2026-10-01'))), 'sent, and not late yet');
+        $this->assertSame(ClaimRules::NO_RESPONSE,
+            $rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-08-19', upload: self::upload('success', '2026-08-19')))['kind'] ?? null, 'sent, then no response');
+        $this->assertSame(ClaimRules::NO_RESPONSE,
+            $rules->decide(self::claim(ClaimRecord::STATUS_BILLED, '2026-08-19', upload: self::upload('something-new', '2026-08-19')))['kind'] ?? null,
+            'a status this module does not know is neither failed nor pending');
     }
 
     /**

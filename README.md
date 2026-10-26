@@ -166,13 +166,16 @@ The tab lists claims that need billing staff, at most one row per visit:
 | Kind | Listed when | Priority |
 |---|---|---|
 | Denied | The visit's latest claim is a denial that OpenEMR's ERA posting recorded. When an 835 says a claim was denied, OpenEMR posts nothing, marks the claim denied, and says "follow up manually" | High |
+| Claim file not sent | The latest upload that carried the claim, through OpenEMR's "Auto SFTP claims to X12 partner" (core's `x12_remote_tracker`), failed: its settings, the local file, the login, the remote folder, or from 8.5.0 the upload itself. The claim is billed, its level open, and nothing posted since. A later successful upload of the claim clears it | High |
+| Claim file still waiting | The latest upload that carried the claim has been waiting, or stuck mid-upload, for more than 24 hours, which usually means the SFTP background service isn't running | Normal |
 | No payer response | The latest claim was billed to an insurer more than 45 days ago, that insurance level isn't closed, and no payment or adjustment has been posted at that level since | Normal; High after 90 days |
 | Line written off with a denial reason | A remittance adjusted a line off ("Adjust code NN", as OpenEMR posts it), paid nothing for it, and gave a reason other than the contractual 45 or 59. OpenEMR before 8.4.1 posted a line denial that way; since openemr/openemr#11868 (in 8.4.1) it refuses to post one | High |
 | Remittance left the insurance open | A payment or adjustment was posted at the claim's level more than 30 days ago and the level is still open. Since 8.4.1, a line OpenEMR won't post stops the rest of that claim's posting and leaves the level open, so this is how such a claim shows | Normal |
 | Flagged for follow-up | Someone ticked **Follow Up** on a line in payment posting | Normal |
 
 - **What each row shows:** the payer and the service date, when the claim was billed or denied, the denial reason codes with their descriptions (from OpenEMR's own list), and the follow-up note.
-- **The button** opens OpenEMR's posting page for the visit.
+- **The button** opens OpenEMR's posting page for the visit, or for a claim file not sent, OpenEMR's Claim File Tracker (`interface/billing/billing_tracker.php`), where the file can be sent again.
+- **Uploads before 8.5.0:** a file whose upload itself failed was recorded as sent until openemr/openemr#14336 (in 8.5.0), so on older releases only the failures before the upload show. Dates are when the file was queued (`created_at`): core stamps `updated_at` on the 12-hour clock with no AM or PM.
 - **Window:** claims billed or denied in the last 365 days.
 - **Who sees it:** only users OpenEMR's Billing Manager admits (`acct/eob` or `acct/bill`, with write). The tab, its counts and its actions aren't there for anyone else.
 
@@ -181,6 +184,8 @@ Telling a line denial from a contractual write-off uses OpenEMR's own rule: on a
 ## Care gaps run in the background
 
 OpenEMR's rules engine takes about 150 ms per patient, which is too slow to run when the page loads. The background service **Staff Worklist care gaps** (Admin › Config › Background Services) runs every 10 minutes while someone is logged in or from cron, and caches the results. The schedule itself is read live, so a cancelled visit drops off immediately. The page shows when gaps were last checked, and **Check now** runs the job on demand.
+
+**Multisite, OpenEMR 8.2.0 to 8.4.1:** a background service started for a site other than `default` ran against the default site's database (openemr/openemr#14359, fixed in 8.5.0; it came with #11801 in 8.2.0). On those releases this job never refreshes another site's patients, so their care gaps update only with **Check now**. The care gaps strip says so on such a site when the checks are more than a day behind or visits haven't been checked. Single-site installs, 8.1.x and 8.5.0 or later aren't affected.
 
 ## Install
 

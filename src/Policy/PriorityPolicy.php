@@ -42,6 +42,8 @@ final class PriorityPolicy
         public readonly int $claimWindowDays = 365,
         // A remittance posted to a claim and its insurance level is still open this many days later.
         public readonly int $claimPartlyPostedDays = 30,
+        // A claim file queued for OpenEMR's SFTP upload to an X12 partner and still not sent after this many hours.
+        public readonly int $claimNotSentHours = 24,
     ) {
     }
 

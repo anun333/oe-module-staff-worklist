@@ -74,6 +74,8 @@ A row is a patient's latest PHQ-2, PHQ-4, PHQ-9, GAD-7 or AUDIT-C from the last 
 
 Patients with a visit in the next 2 days whose clinical reminders are due. **Open chart** to prepare. **Care gaps checked** says when they were last checked; **Check now** checks again.
 
+On a multisite install running OpenEMR 8.2 to 8.4, the background check runs only against the default site, so on any other site the gaps update only when someone uses **Check now**. The strip says so there when the checks are more than a day behind. OpenEMR 8.5.0 fixed it.
+
 *What it doesn't do:* it looks only at non-recurring appointments, each patient's next visit, and up to 500 patients. It lists every active rule's reminders, including any the chart hides from you.
 
 ### Get replies to referrals
@@ -108,12 +110,15 @@ An authorization in force is listed when its units are used up (**High**), it en
 
 One row per visit, for claims billed or denied in the last 365 days:
 - denied (**High**);
+- a claim file OpenEMR's automatic SFTP upload didn't send to the clearinghouse (**High**), or one still waiting to be sent after a day;
 - billed over 45 days ago with nothing posted since (**High** after 90 days);
 - a line written off with a denial reason (**High**);
 - a remittance posted over 30 days ago that left the insurance open;
 - a line flagged for follow-up in payment posting.
 
 Each row shows the payer, service date, denial reasons and follow-up note. **Open posting** opens OpenEMR's posting page for the visit. The row leaves when the claim is billed again, the insurance level is closed, something is posted at that level, or the flag is unticked. A write-off stays until you dismiss it.
+
+For a claim file that wasn't sent, the row shows the upload's status, the file and the first error, and **Open claim file tracker** opens OpenEMR's Claim File Tracker, where the file can be checked and sent again. Fix the cause first (the clearinghouse login or folder in the X12 partner's settings, usually). The row leaves once a later upload of the claim succeeds. One still waiting after a day usually means OpenEMR's SFTP background service isn't running. Before OpenEMR 8.5.0 a file whose upload itself failed was recorded as sent, so there only the earlier failures (settings, login, the remote folder) show.
 
 *What it doesn't do:* it shows how long ago a claim was denied, not an appeal deadline, since those differ by payer.
 
