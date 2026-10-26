@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.8.5 (unreleased)
+## 0.8.5 (2026-10-26)
 
 - **Claim files that never reached the clearinghouse are listed.** With OpenEMR's "Auto SFTP claims to X12 partner" on, each batch file is queued for upload and its outcome recorded in core's `x12_remote_tracker`. The **Claims follow-up** tab now lists a billed claim whose latest upload failed (the partner's settings, the local file, the login, the remote folder, or from OpenEMR 8.5.0 the upload itself), **High**, ahead of "no response", which it explains; and one whose file has been waiting, or stuck mid-upload, for more than a day, which usually means the SFTP background service isn't running. A later successful upload of the claim clears it. The row shows the status, file and first error, and its button opens OpenEMR's Claim File Tracker. Before 8.5.0 a failed upload itself was recorded as sent (openemr/openemr#14336), so there only the earlier failures show.
 - **Multisite on OpenEMR 8.2 to 8.4:** there a background service for a site other than `default` ran against the default site (openemr/openemr#14359, fixed in 8.5.0), so this module's care gaps job never refreshed another site's patients. The care gaps strip now says so on such a site when its checks are more than a day behind, and points to **Check now**; the README and the staff guide explain it.
