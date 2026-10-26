@@ -19,6 +19,7 @@ declare(strict_types=1);
 namespace OpenHealthcare\StaffWorklist\Source;
 
 use OpenEMR\Common\Database\QueryUtils;
+use OpenHealthcare\Common\QuestionnaireStatus;
 use OpenHealthcare\StaffWorklist\Model\ItemKey;
 use OpenHealthcare\StaffWorklist\Model\PatientRef;
 use OpenHealthcare\StaffWorklist\Model\WorkItem;
@@ -110,8 +111,7 @@ final class SocialNeedsSource implements WorkSourceInterface
                 fe.facility_id AS site_id, fe.sensitivity, " . PatientRef::SQL_COLUMNS . "
             FROM questionnaire_response AS qr
             JOIN patient_data AS pd ON pd.pid = qr.patient_id
-            LEFT JOIN questionnaire_repository AS rep ON rep.id = qr.questionnaire_foreign_id
-            LEFT JOIN form_encounter AS fe ON qr.encounter > 0 AND fe.encounter = qr.encounter AND fe.pid = qr.patient_id
+            LEFT JOIN questionnaire_repository AS rep ON rep.id = qr.questionnaire_foreign_id" . ResponseVisit::JOINS . "
             WHERE qr.create_time >= ?
               AND (COALESCE(NULLIF(qr.questionnaire, ''), rep.questionnaire) LIKE ? OR COALESCE(NULLIF(qr.questionnaire, ''), rep.questionnaire) LIKE ?)
               AND NOT EXISTS (
@@ -122,6 +122,10 @@ final class SocialNeedsSource implements WorkSourceInterface
         if ($pid !== null) {
             $binds[] = $pid;
         }
+        // Which responses count, by status (QuestionnaireStatus); the visit is ResponseVisit's.
+        [$statusFilter, $statusBinds] = QuestionnaireStatus::condition('qr');
+        $sql .= " AND $statusFilter";
+        array_push($binds, ...$statusBinds);
         $fss = [self::FSS_TOTAL => new ScreeningInstrument('Food security (six-item)', self::FSS_TOTAL, 2, null,
             'low or very low food security', 'USDA ERS, Six-Item Short Form user notes (May 2024)', null, null, [],
             panelCode: self::FSS_PANEL, questions: ['88123-5' => 1, '95248-1' => 1, '95249-9' => 1, '95250-7' => 1, '95251-5' => 1, '95252-3' => 1])];
@@ -182,7 +186,9 @@ final class SocialNeedsSource implements WorkSourceInterface
      */
     private function services(array $pids, \DateTimeImmutable $since): array
     {
-        if (!self::tableExists('uds_value_set_code')) {
+        // uds_value_set_code is the UDS Report module's table (its value set expansions): without that
+        // module, or with a version whose table lacks these columns, services aren't read at all.
+        if (!self::columnsExist('uds_value_set_code', ['code', 'oid'])) {
             return [];
         }
         $lineOf = [];
@@ -252,6 +258,17 @@ final class SocialNeedsSource implements WorkSourceInterface
     private static function tableExists(string $name): bool
     {
         return QueryUtils::fetchRecords('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?', [$name]) !== [];
+    }
+
+    /** @param list<string> $columns */
+    private static function columnsExist(string $table, array $columns): bool
+    {
+        $found = QueryUtils::fetchRecords(
+            'SELECT column_name AS name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name IN ('
+                . implode(', ', array_fill(0, count($columns), '?')) . ')',
+            [$table, ...$columns]
+        );
+        return count($found) === count($columns);
     }
 
     private static function date(mixed $value): ?\DateTimeImmutable

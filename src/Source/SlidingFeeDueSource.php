@@ -32,11 +32,23 @@ final class SlidingFeeDueSource implements WorkSourceInterface
     ) {
     }
 
-    /** Whether the Sliding Fee Discount module is installed and enabled here. */
+    /**
+     * Whether the Sliding Fee Discount module is installed and enabled here, with the columns this
+     * reads: sliding_fee_schedule and sliding_fee_assessment are that module's tables, so a version
+     * of it without them leaves the tab off rather than failing the Worklist.
+     */
     public static function available(): bool
     {
         $rows = QueryUtils::fetchRecords('SELECT 1 FROM `modules` WHERE `mod_directory` = ? AND `mod_active` = 1 LIMIT 1', [self::MODULE]);
-        return $rows !== [];
+        if ($rows === []) {
+            return false;
+        }
+        $found = QueryUtils::fetchRecords(
+            "SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE()
+                AND ((table_name = 'sliding_fee_schedule' AND column_name IN ('id', 'schedule_json'))
+                  OR (table_name = 'sliding_fee_assessment' AND column_name IN ('id', 'pid', 'assessed_on')))"
+        );
+        return count($found) === 5;
     }
 
     public function id(): string

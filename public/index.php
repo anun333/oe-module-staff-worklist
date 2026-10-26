@@ -21,6 +21,7 @@ use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Core\Header;
 use OpenEMR\Core\OEGlobalsBag;
 use OpenHealthcare\StaffWorklist\Bootstrap;
+use OpenHealthcare\StaffWorklist\Guide;
 use OpenHealthcare\StaffWorklist\Model\ItemKey;
 use OpenHealthcare\StaffWorklist\Model\ItemState;
 use OpenHealthcare\StaffWorklist\Model\SiteAccess;
@@ -238,6 +239,7 @@ if ($service->sites->isRestrictionEnabled()) {
                     </div>
                 </form>
             </div>
+            <a class="btn btn-sm btn-link mb-2 ml-1" href="<?php echo attr(Guide::url()); ?>" target="_blank" rel="noopener"><?php echo xlt('Help'); ?><span class="sr-only"> (<?php echo xlt('opens in a new tab'); ?>)</span></a>
         </div>
     </div>
     <?php if ($siteAccess->restricted) { ?>

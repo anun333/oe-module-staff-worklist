@@ -2,9 +2,9 @@
 
 One queue of outstanding staff work across all patients, so nobody has to check four separate reports.
 
-**Status: 0.8.2, a pre-release.** Tested on OpenEMR with synthetic data only, access checks included (see [Compatibility](#compatibility)). It lists many patients' work on one page, so read [Access](#access) and [FOOTPRINT.md](FOOTPRINT.md) before installing, and try it with your own users and settings before giving staff access.
+**Status: 0.8.3, a pre-release.** Tested on OpenEMR with synthetic data only, access checks included (see [Compatibility](#compatibility)). It lists many patients' work on one page, so read [Access](#access) and [FOOTPRINT.md](FOOTPRINT.md) before installing, and try it with your own users and settings before giving staff access.
 
-Using the module day to day, tab by tab for each role: see [GUIDE.md](GUIDE.md).
+Using the module day to day, tab by tab for each role: see [GUIDE.md](GUIDE.md), or the page's **Help** link, which opens the guide for the installed version.
 
 | Tab | Listed when | Leaves the list when | Default owner |
 |---|---|---|---|
@@ -268,7 +268,7 @@ The unit tests need no database or OpenEMR install. CI runs them, and the footpr
 - Thresholds, including the 4-hour critical-results limit, are code constants, not admin settings yet.
 - Overdue critical results are flagged on the page only. Nobody is paged or notified.
 - Sensitivity masking applies to results, orders and screening responses filled in at a visit. Referrals, care gaps and responses filled in outside a visit aren't tied to a visit, so they have no sensitivity to apply.
-- Screening follow-up counts responses whatever their status, because OpenEMR's questionnaire runtime saves them all as `in-progress`.
+- Screening follow-up and social needs count a saved questionnaire by its status. OpenEMR's runtime from 0.4.0 (in 8.5.0 and later) saves a submitted response as `completed`, or `amended` when it was completed before; earlier runtimes saved every response as `in-progress`. Until a site has its first `completed` or `amended` response, every response counts. After it, a response saved earlier counts whatever its status, and a later one only when `completed` or `amended`, so a draft an outside app leaves `in-progress` isn't treated as a finished screen. `entered-in-error` never counts.
 - Screening follow-up can't see follow-up written only in a note, or a referral made for it (a referral's reason is free text). Dismiss the item with a reason.
 - The PHQ-4's 0 to 12 total isn't followed up on its own: its authors give it no cut-off for screening, only one for each part.
 - Claims follow-up shows how long ago a claim was denied rather than an appeal deadline, since those differ by payer. On 8.4.1 and later, a line OpenEMR refused to post is found only through the insurance it left open; the remittance itself names the line.

@@ -5,7 +5,8 @@
  * them (ScreeningRules), from the questionnaire responses OpenEMR's own runtime saves,
  * and from OpenEMR's own PHQ-9 and GAD-7 encounter forms (CoreFormScoring). A response
  * whose encounter form was deleted isn't read: OpenEMR keeps the response row when the
- * form is deleted; a deleted PHQ-9 or GAD-7 form isn't read either.
+ * form is deleted; a deleted PHQ-9 or GAD-7 form isn't read either. Which responses count, by
+ * their status, is openhealthcare-common's QuestionnaireStatus rule; the visit is ResponseVisit's.
  *
  * @package   OpenEMR
  * @link      https://www.open-emr.org
@@ -19,6 +20,7 @@ declare(strict_types=1);
 namespace OpenHealthcare\StaffWorklist\Source;
 
 use OpenEMR\Common\Database\QueryUtils;
+use OpenHealthcare\Common\QuestionnaireStatus;
 use OpenHealthcare\StaffWorklist\Model\ItemKey;
 use OpenHealthcare\StaffWorklist\Model\PatientRef;
 use OpenHealthcare\StaffWorklist\Model\WorkItem;
@@ -63,6 +65,8 @@ final class ScreeningFollowUpSource implements WorkSourceInterface
             $patientFilter = 'AND qr.patient_id = ?';
             $binds[] = $pid;
         }
+        [$statusFilter, $statusBinds] = QuestionnaireStatus::condition('qr');
+        array_push($binds, ...$statusBinds);
 
         // The Questionnaire is the response row's own copy, else the repository's.
         $sql = "SELECT qr.id, qr.patient_id, qr.create_time, ru.fname AS by_fname, ru.lname AS by_lname,
@@ -73,8 +77,7 @@ final class ScreeningFollowUpSource implements WorkSourceInterface
                 " . PatientRef::SQL_COLUMNS . "
             FROM questionnaire_response AS qr
             JOIN patient_data AS pd ON pd.pid = qr.patient_id
-            LEFT JOIN questionnaire_repository AS rep ON rep.id = qr.questionnaire_foreign_id
-            LEFT JOIN form_encounter AS fe ON qr.encounter > 0 AND fe.encounter = qr.encounter AND fe.pid = qr.patient_id
+            LEFT JOIN questionnaire_repository AS rep ON rep.id = qr.questionnaire_foreign_id" . ResponseVisit::JOINS . "
             LEFT JOIN users AS ru ON qr.creator_user_id > 0 AND ru.id = qr.creator_user_id
             WHERE qr.create_time >= ?
               AND (" . implode(' OR ', $mentions) . ")
@@ -82,7 +85,8 @@ final class ScreeningFollowUpSource implements WorkSourceInterface
                   SELECT 1 FROM form_questionnaire_assessments AS fqa
                   JOIN forms AS f ON f.form_id = fqa.id AND f.pid = fqa.pid AND f.formdir = 'questionnaire_assessments'
                   WHERE fqa.response_id = qr.response_id AND f.deleted = 1)
-              $patientFilter";
+              $patientFilter
+              AND $statusFilter";
 
         $responses = [];
         $rows = [];
