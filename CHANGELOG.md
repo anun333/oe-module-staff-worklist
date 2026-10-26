@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.8.6 (unreleased)
+## 0.8.6 (2026-10-26)
 
 - **Fixed: dismissing one problem on a record no longer hides a later, different problem on it.** A dismissal was kept for as long as the item's key existed, and three tabs used one key for every problem a record could have. So a dismissed denial hid the "claim file not sent" (or the next denial, partial posting or no response) on that visit; dismissing "ends within 14 days" hid "units used up"; dismissing "runs out soon" hid "ran out". Each of those items' keys now names its problem, as screening items already did, and a claim's key also names the claim version, so a claim billed again and denied again comes back. The same problem stays dismissed.
 - **Upgrading keeps what staff recorded.** The first time 0.8.6 lists one of these tabs, each assignment, note, snooze or dismissal saved under a 0.8.5 key moves to the item that record shows then, and the 0.8.5 row goes, so it never carries onto a later problem. A row whose record lists nothing any more is dropped. Both are written to the log (`rekey`, `drop`). A tab a user can't see is left until someone who can lists it.
