@@ -52,7 +52,19 @@ final class ItemKeyTest extends TestCase
         self::assertNotNull(ItemKey::parse('social:3:qr-41'), 'or from a questionnaire response');
     }
 
-    public function testAnotherModulesSourceIsAKeyOnlyOnceItsBeenAdded(): void
+    public function testClaimsAuthorizationAndSlidingFeeKeysNameTheirCondition(): void
+    {
+        foreach (['claim:3:345.1v2', 'claim:3:345.3', 'auth:3:41.2', 'sliding:3:88.3', 'claim:3:345', 'auth:3:41'] as $raw) {
+            $key = ItemKey::parse($raw);
+            self::assertNotNull($key, $raw);
+            self::assertSame($raw, (string)$key);
+        }
+        self::assertSame('345', ItemKey::parse('claim:3:345.1v2')?->record(), 'the record the condition is about');
+        self::assertSame('41', ItemKey::parse('auth:3:41')?->record(), 'a key saved before 0.8.6');
+        self::assertSame('phq9-7', ItemKey::parse('screen:3:phq9-7.2')?->record());
+    }
+
+        public function testAnotherModulesSourceIsAKeyOnlyOnceItsBeenAdded(): void
     {
         $this->assertNull(ItemKey::parse('caremgmtx:9001:12202609'), 'not yet added');
         ItemKey::allow('caremgmtx');
@@ -94,7 +106,11 @@ final class ItemKeyTest extends TestCase
             'an unknown form name' => ['screen:1:audit-7'],
             'a form name with no id' => ['screen:1:phq9-'],
             'a form name after the id' => ['screen:1:7-phq9'],
-            'a dotted prior authorization' => ['auth:1:4.2'],
+            'a claim version outside claims' => ['auth:1:4.2v3'],
+            'a claim version on a screen' => ['screen:1:12.2v1'],
+            'a dotted order' => ['order:1:10.2'],
+            'a claim version with no condition' => ['claim:1:10v2'],
+            'claim version zero' => ['claim:1:10.1v0'],
             'a social needs item with no prefix' => ['social:1:41'],
             'a screening form name on a social item' => ['social:1:phq9-41'],
             'a social prefix on a screening item' => ['screen:1:sdoh-41'],

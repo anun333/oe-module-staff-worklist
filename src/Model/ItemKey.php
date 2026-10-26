@@ -10,6 +10,14 @@
  * encounter form has its form's name before the id ("phq9-7", "gad7-7.3"), since those
  * ids are another table's.
  *
+ * Claims follow-up, prior authorization and sliding fee items do the same from 0.8.6: the
+ * digit after the dot names the condition (ClaimRules, AuthorizationRules and
+ * ReassessmentRules give each one its digit), and a claim's key also names the claim
+ * version after a "v" ("345.1v2"). So dismissing a denial never hides the "claim file not
+ * sent" that follows it, or the denial of the claim billed again; "ends soon" never hides
+ * "units used up"; "runs out soon" never hides "ran out". Keys saved before 0.8.6 have no
+ * dot; LegacyKeys carries their state over once.
+ *
  * The pid is part of the key so an action request can be re-checked against
  * the source for that one patient instead of trusting what the browser sent.
  *
@@ -41,7 +49,10 @@ final class ItemKey
     /** @var array<string, true> sources other modules added for this request */
     private static array $contributed = [];
 
-    private const PATTERN = '/^([a-z][a-z0-9]{2,15}):([1-9]\d{0,17}):((?:(phq9|gad7|sdoh|qr)-)?[1-9]\d{0,17}(?:\.[1-9])?)$/D';
+    private const PATTERN = '/^([a-z][a-z0-9]{2,15}):([1-9]\d{0,17}):((?:(phq9|gad7|sdoh|qr)-)?[1-9]\d{0,17}(?:\.[1-9](v[1-9]\d{0,8})?)?)$/D';
+
+    /** Sources whose ref may end in a condition digit after a dot: screening, and from 0.8.6 these three. */
+    private const CONDITION_SOURCES = [self::SOURCE_SCREEN, self::SOURCE_CLAIM, self::SOURCE_AUTH, self::SOURCE_SLIDING];
 
     /** Accepts another module's source in keys, for this request (WorklistService does it as the module adds it). */
     public static function allow(string $source): void
@@ -70,8 +81,9 @@ final class ItemKey
     }
 
     /**
-     * The pattern; a dotted ref or a "phq9-"/"gad7-" prefix only on a screening item; a "sdoh-" or "qr-"
-     * prefix, which a social needs item always has, only there.
+     * The pattern; a dotted ref only on a screening, claims, prior authorization or sliding fee item, and
+     * a claim version ("v2") only on a claims item; a "phq9-"/"gad7-" prefix only on a screening item; a
+     * "sdoh-" or "qr-" prefix, which a social needs item always has, only there.
      */
     private static function valid(string $key): bool
     {
@@ -79,12 +91,25 @@ final class ItemKey
             return false;
         }
         $prefix = $m[4] ?? '';
+        $dotted = str_contains($m[3], '.');
+        if (($m[5] ?? '') !== '' && $m[1] !== self::SOURCE_CLAIM) {
+            return false;
+        }
+        if ($dotted && !in_array($m[1], self::CONDITION_SOURCES, true)) {
+            return false;
+        }
         return match ($m[1]) {
             self::SOURCE_SCREEN => in_array($prefix, ['', 'phq9', 'gad7'], true),
-            self::SOURCE_SOCIAL => in_array($prefix, ['sdoh', 'qr'], true) && !str_contains($m[3], '.'),
+            self::SOURCE_SOCIAL => in_array($prefix, ['sdoh', 'qr'], true),
             // Another module's source: only once it's been added, and with a plain ref.
-            default => (in_array($m[1], self::BUILT_IN, true) || isset(self::$contributed[$m[1]])) && $prefix === '' && !str_contains($m[3], '.'),
+            default => (in_array($m[1], self::BUILT_IN, true) || isset(self::$contributed[$m[1]])) && $prefix === '',
         };
+    }
+
+    /** The ref without its condition digit or claim version: the record the item is about. */
+    public function record(): string
+    {
+        return explode('.', $this->ref, 2)[0];
     }
 
     public function __toString(): string

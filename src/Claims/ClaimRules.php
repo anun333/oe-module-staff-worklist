@@ -44,6 +44,21 @@ final class ClaimRules
     public const NOT_SENT = 'not_sent';
     /** Adjustment reasons OpenEMR treats as contractual write-offs (CO-45, CO-59) when a line is paid nothing. */
     public const CONTRACTUAL = ['45', '59'];
+    /** Each condition's digit in an item key (ItemKey); fixed, since saved dismissals carry it. */
+    public const KEY_DIGITS = [
+        self::DENIED => 1, self::NO_RESPONSE => 2, self::FLAGGED => 3, self::WRITTEN_OFF => 4,
+        self::PARTLY_POSTED => 5, self::UPLOAD_FAILED => 6, self::NOT_SENT => 7,
+    ];
+
+    /**
+     * An item's key ref: the encounter, the condition's digit and the claim version, so a dismissal holds
+     * only the condition it was made on, for that version of the claim ("345.1v2"). A visit with only a
+     * follow-up flag has no claim version (0), and its ref has none.
+     */
+    public static function keyRef(int $encounter, string $kind, int $version): string
+    {
+        return $encounter . '.' . (self::KEY_DIGITS[$kind] ?? 9) . ($version > 0 ? 'v' . $version : '');
+    }
 
     public function __construct(
         private readonly PriorityPolicy $policy,

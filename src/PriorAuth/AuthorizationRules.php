@@ -28,6 +28,14 @@ final class AuthorizationRules
     public const ENDING = 'ending';
     public const UNITS_LOW = 'units_low';
     public const ENDING_DAYS = 14;
+    /** Each condition's digit in an item key (ItemKey); fixed, since saved dismissals carry it. */
+    public const KEY_DIGITS = [self::USED_UP => 1, self::ENDING => 2, self::UNITS_LOW => 3];
+
+    /** An item's key ref: the authorization's id and its condition's digit, so "ends soon" never hides "units used up". */
+    public static function keyRef(int $id, string $status): string
+    {
+        return $id . '.' . (self::KEY_DIGITS[$status] ?? 9);
+    }
 
     /**
      * @return array{status: string, priority: int, since: \DateTimeImmutable}|null

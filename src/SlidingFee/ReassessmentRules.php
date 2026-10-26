@@ -25,6 +25,17 @@ final class ReassessmentRules
     public const EXPIRED = 'expired';
     public const SOON = 'soon';
     public const WINDOW_DAYS = 30;
+    /** Each condition's digit in an item key (ItemKey); fixed, since saved dismissals carry it. */
+    public const KEY_DIGITS = [self::NEVER => 1, self::SOON => 2, self::EXPIRED => 3];
+
+    /**
+     * An item's key ref: the latest assessment's id (1 for a patient never assessed) and the condition's
+     * digit, so "runs out soon" never hides "ran out".
+     */
+    public static function keyRef(?int $assessmentId, string $status): string
+    {
+        return ($assessmentId ?? 1) . '.' . (self::KEY_DIGITS[$status] ?? 9);
+    }
 
     /**
      * @param array{id: int, on: \DateTimeImmutable}|null $latest the patient's latest assessment on or before today

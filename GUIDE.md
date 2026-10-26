@@ -26,7 +26,7 @@ Each row shows its **Priority** (**Critical**, **High** or **Normal**), the **Pa
 
 - **Assign**: choose someone in **Assign to**, or **Nobody (use the item owner)**, then **Save**.
 - **Snooze**: choose a date in **Hide until**, up to 30 days ahead. The item comes back that day.
-- **Dismiss**: give a **Reason (required)**, such as "addressed in the visit note".
+- **Dismiss**: give a **Reason (required)**, such as "addressed in the visit note". The dismissal holds only that problem: if the same claim, authorization or assessment later shows a different one (a claim file not sent after a denial, units used up after "ends soon", "ran out" after "runs out soon"), it comes back on the list.
 - **Reopen**: from the **Snoozed** or **Dismissed** view.
 
 *What it doesn't do:* these change only the Worklist, never the chart, and each is logged with who and when. Assigning doesn't tell the person. Unsigned results can't be dismissed, and can be snoozed for 3 days at most. **Critical** results can't be snoozed.

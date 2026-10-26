@@ -52,7 +52,7 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
                 COALESCE(fe.last_level_closed, 0) AS last_level_closed, " . PatientRef::SQL_COLUMNS;
 
         // The latest version of each encounter's claim, and whether anything was posted at its level since.
-        $sql = "SELECT c.patient_id AS pid, c.encounter_id AS encounter, c.status, c.payer_type, c.bill_time, c.process_file,
+        $sql = "SELECT c.patient_id AS pid, c.encounter_id AS encounter, c.version, c.status, c.payer_type, c.bill_time, c.process_file,
                 ic.name AS payer_name,
                 EXISTS (SELECT 1 FROM ar_activity AS a
                     WHERE a.pid = c.patient_id AND a.encounter = c.encounter_id AND a.deleted IS NULL
@@ -140,6 +140,7 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
                 self::date($row['last_posted'] ?? null),
                 $lines,
                 $uploads[$key] ?? null,
+                (int)($row['version'] ?? 0),
             );
             $decision = $this->rules->decide($claim);
             if ($decision !== null) {
@@ -215,7 +216,9 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
 
         $tracker = in_array($decision['kind'], [ClaimRules::UPLOAD_FAILED, ClaimRules::NOT_SENT], true);
         return new WorkItem(
-            key: new ItemKey(ItemKey::SOURCE_CLAIM, $claim->pid, (string)$claim->encounter),
+            // The condition and the claim version are in the key, so a dismissed denial never hides the
+            // upload failure after it, or the denial of the claim billed again.
+            key: new ItemKey(ItemKey::SOURCE_CLAIM, $claim->pid, ClaimRules::keyRef($claim->encounter, $decision['kind'], $claim->version)),
             patient: PatientRef::fromRow($claim->pid, $row, $this->now),
             title: $title,
             detail: implode(' · ', $facts),

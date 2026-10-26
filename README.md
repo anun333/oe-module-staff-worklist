@@ -35,7 +35,7 @@ These change only what the worklist shows. They never change the chart.
 
 - **Assign** to any active user. Unassigned items count as the owner's.
 - **Snooze** until a date. Critical results can't be snoozed, and unsigned results can only be snoozed for up to 3 days.
-- **Dismiss** with a required reason. Unsigned results can't be dismissed; only signing them clears them.
+- **Dismiss** with a required reason. Unsigned results can't be dismissed; only signing them clears them. A dismissal holds only the problem it was made on: if the record later shows a different one (a claim file not sent after a denial, the claim denied again after it was billed again, units used up after "ends soon", "ran out" after "runs out soon"), that comes back. From 0.8.6; on upgrade, what staff saved is moved to each item once.
 - **Reopen** a snoozed or dismissed item.
 
 Every change is written to `staff_worklist_log`, with who made it and when.
@@ -79,7 +79,7 @@ This supports role-based access under HIPAA's minimum necessary standard, but yo
 - **Overdue critical results.** A result with a panic value that stays unsigned for 4 hours is marked **Overdue**. A red banner states how many there are, whatever the current view, scope, site or tab, as long as the user may see them. Set `criticalOverdueHours` in `src/Policy/PriorityPolicy.php` to match the clinic's critical-results policy.
 - **Results the patient can already see.** The patient portal shows results whether or not anyone has signed them (`portal/get_lab_results.php`). When the portal is enabled and the patient can log in, unsigned abnormal and critical results say "Patient can already see this in the portal", so staff know to contact the patient first. The worklist doesn't hold results back from the portal, because that would risk information blocking under the Cures Act.
 - **Deceased patients.** Their work is labelled **Deceased**. Their unsigned results still need signing, but they get no pre-visit care gaps.
-- **Audit.** Each view of the worklist is written to OpenEMR's audit log, and each assign, snooze, dismiss or reopen to `staff_worklist_log`.
+- **Audit.** Each view of the worklist is written to OpenEMR's audit log, and each assign, snooze, dismiss or reopen to `staff_worklist_log` (with `rekey` and `drop` for the one-time move of what was saved under 0.8.5 keys).
 
 To size the worklist for a real clinic, run the read-only `tools/profile-counts.sql` as a read-only database user. It returns clinic-wide counts only, with no patient details, covering:
 - The age of the unsigned-results backlog.
@@ -244,7 +244,7 @@ Tested with synthetic data on:
 | 8.4.0, 8.3.0, 8.2.0, 8.1.0 (official Docker images) | passes (Module Manager) | not tested | not tested |
 | 8.0.0 and older | stays switched off (before this release, enabling it on 7.0.4 to 8.0.x stopped every page): it uses OpenEMR's `AccessDeniedHelper`, added in 8.1.0 | | |
 
-On 8.1.0, 8.2.0, 8.3.0 and 8.4.0 (checked 2026-10-12 with `dev/module_compat_check.sh` in the openhealthcare repository) the module was copied in, installed and enabled through Module Manager, and its page loaded for an administrator with no PHP error, on a fresh install with no patients. That's a smaller check than the 8.4.1 and master rows. 8.1 and 8.2 need the module to load OpenEMR's `library/user.inc.php` itself, which 8.3 started loading for every page; the page now does. The module needs PHP 8.3 or later, which 8.1 and 8.2 also run on.
+On 8.1.0, 8.2.0, 8.3.0 and 8.4.0 (checked 2026-10-12 with `dev/module_compat_check.sh` in the openhealthcare repository) the module was copied in, installed and enabled through Module Manager, and its page loaded for an administrator with no PHP error, on a fresh install with no patients. That's a smaller check than the 8.4.1 and master rows. 8.1 and 8.2 need the module to load OpenEMR's `library/user.inc.php` itself, which 8.3 started loading for every page; the page now does. The module needs PHP 8.2 or later (8.3 until 0.8.6, though nothing needed it).
 
 **Install** means a fresh OpenEMR that installed itself, then `composer require` from this repository, then Register, Install and Enable in Modules › Manage Modules. Each step's effect was checked: where the files went, the three tables, the background service switching on (and off again when disabled), the menu entry and the permission it requires, the page rendering, and no PHP warnings from the module in Apache's logs.
 

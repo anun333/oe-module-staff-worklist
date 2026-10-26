@@ -84,8 +84,9 @@ final class PriorAuthorizationSource implements WorkSourceInterface
                 $facts[] = sprintf(xl('%1$d of %2$d units left'), $remaining, $initial);
             }
             $items[] = new WorkItem(
-                // A renewed authorization is a new row, so a dismissed one comes back for the next.
-                key: new ItemKey(ItemKey::SOURCE_AUTH, (int)$row['pid'], (string)(int)$row['id']),
+                // A renewed authorization is a new row, so a dismissed one comes back for the next; and the
+                // condition is in the key, so dismissing "ends soon" never hides "units used up".
+                key: new ItemKey(ItemKey::SOURCE_AUTH, (int)$row['pid'], AuthorizationRules::keyRef((int)$row['id'], $decision['status'])),
                 patient: $patient,
                 title: $title,
                 detail: implode(' · ', $facts),

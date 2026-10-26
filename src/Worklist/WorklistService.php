@@ -149,8 +149,41 @@ final class WorklistService
         foreach ($this->sources as $source) {
             array_push($items, ...$source->collect());
         }
-        $states = $this->states->findByKeys(array_map(static fn(WorkItem $i): string => (string)$i->key, $items));
+        $keys = array_map(static fn(WorkItem $i): string => (string)$i->key, $items);
+        $this->carryLegacyState($items, $keys, $filter->userId);
+        $states = $this->states->findByKeys($keys);
         return $this->assembler->assemble($items, $states, $filter, $today, $this->sites->accessFor($filter->userId));
+    }
+
+    /**
+     * State saved before 0.8.6 under a key with no condition goes, once, to the item's key now
+     * (LegacyKeys). Only for the sources this user's list has, so a source the user can't see keeps
+     * its rows until someone who can lists it.
+     *
+     * @param WorkItem[] $items
+     * @param string[]   $keys
+     */
+    private function carryLegacyState(array $items, array $keys, int $userId): void
+    {
+        $sources = array_values(array_intersect(LegacyKeys::SOURCES, array_keys($this->sources)));
+        if ($sources === []) {
+            return;
+        }
+        $legacy = $this->states->legacyKeys($sources);
+        if ($legacy === []) {
+            return;
+        }
+        $mine = array_values(array_filter($items, static fn(WorkItem $i): bool => in_array($i->source(), $sources, true)));
+        $stated = array_fill_keys(array_keys($this->states->findByKeys(
+            array_map(static fn(WorkItem $i): string => (string)$i->key, $mine)
+        )), true);
+        $plan = LegacyKeys::plan($mine, $legacy, $stated);
+        foreach ($plan['moves'] as $from => $to) {
+            $this->states->rekey($from, $to, $userId);
+        }
+        foreach ($plan['drops'] as $key) {
+            $this->states->drop($key, $userId);
+        }
     }
 
     /** Whether this worklist includes a source (the claims and referrals sources depend on the user). */

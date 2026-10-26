@@ -34,6 +34,7 @@ final class ClaimRecord
      *        adjusted off with a reason other than the contractual 45 or 59 ("Adjust code NN") and paid nothing in that remittance
      * @param array{status: string, at: \DateTimeImmutable, file: string, partner: string, message: string}|null $upload
      *        the latest SFTP upload to an X12 partner that carried this claim (ClaimUpload), or null when none did
+     * @param int                            $version         claims.version of the latest version; 0 when the encounter has only flags
      */
     public function __construct(
         public readonly int $pid,
@@ -49,6 +50,7 @@ final class ClaimRecord
         public readonly ?\DateTimeImmutable $lastPosted = null,
         public readonly array $writeOffs = [],
         public readonly ?array $upload = null,
+        public readonly int $version = 0,
     ) {
     }
 }

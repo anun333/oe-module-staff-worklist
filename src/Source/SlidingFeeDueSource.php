@@ -99,8 +99,9 @@ final class SlidingFeeDueSource implements WorkSourceInterface
                 $facts[] = xl('Re-assess by') . ' ' . oeFormatShortDate($decision['dueOn']->format('Y-m-d'));
             }
             $items[] = new WorkItem(
-                // A new assessment gives a new key, so a dismissed row comes back when that one runs out.
-                key: new ItemKey(ItemKey::SOURCE_SLIDING, (int)$row['pid'], (string)($latest['id'] ?? 1)),
+                // A new assessment gives a new key, so a dismissed row comes back when that one runs out; and
+                // the condition is in the key, so dismissing "runs out soon" never hides "ran out".
+                key: new ItemKey(ItemKey::SOURCE_SLIDING, (int)$row['pid'], ReassessmentRules::keyRef($latest['id'] ?? null, $decision['status'])),
                 patient: PatientRef::fromRow((int)$row['pid'], $row, $this->now),
                 title: $title,
                 detail: implode(' · ', $facts),
