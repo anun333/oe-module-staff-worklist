@@ -107,6 +107,7 @@ As written in the source; whether they behave correctly for a given user is not 
 
 ## Settings it reads
 
+- `css_header` (`src/Contrast.php`)
 - `portal_onsite_two_enable` (`src/Worklist/WorklistService.php`)
 - `restrict_user_facility` (`src/Repository/SiteDirectory.php`)
 - `v_js_includes` (`public/index.php`)
@@ -128,9 +129,9 @@ As written in the source; whether they behave correctly for a given user is not 
 
 | part | files | lines |
 |---|---|---|
-| PHP logic (`src/`) | 48 | 4761 |
-| tests (`tests/`, `phpunit.xml.dist`) | 18 | 1698 |
-| pages (`public/`) | 4 | 843 |
+| PHP logic (`src/`) | 49 | 4811 |
+| tests (`tests/`, `phpunit.xml.dist`) | 19 | 1745 |
+| pages (`public/`) | 4 | 844 |
 | module wiring | 5 | 173 |
 | tools (`tools/`) | 2 | 131 |
 | install SQL (`sql/`) | 1 | 57 |

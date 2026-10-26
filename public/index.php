@@ -194,6 +194,7 @@ if ($service->sites->isRestrictionEnabled()) {
 <head>
     <title><?php echo xlt('Worklist'); ?></title>
     <?php Header::setupHeader(['common']); ?>
+    <?php echo \OpenHealthcare\StaffWorklist\Contrast::style(); ?>
     <link rel="stylesheet" href="<?php echo attr($moduleUrl); ?>/public/assets/worklist.css?v=<?php echo attr_url(OEGlobalsBag::getInstance()->getString('v_js_includes')); ?>">
 </head>
 <body class="body_top">
