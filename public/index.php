@@ -30,6 +30,7 @@ use OpenHealthcare\StaffWorklist\Policy\PriorityPolicy;
 use OpenHealthcare\StaffWorklist\Worklist\WorklistFilter;
 use OpenHealthcare\StaffWorklist\Worklist\WorklistRow;
 use OpenHealthcare\StaffWorklist\Worklist\WorklistService;
+use OpenHealthcare\Common\OpenEmr;
 
 if (!AclMain::aclCheckCore('patients', 'med')) {
     AccessDeniedHelper::denyWithTemplate('ACL check failed for patients/med: Staff Worklist', xl('Worklist'));
@@ -56,7 +57,7 @@ $filter = $filter->withSites($selectedSites);
 $result = $service->build($filter, $now);
 $careGapStatus = $service->careGapStatus();
 $canAct = AclMain::aclCheckCore('patients', 'med', '', 'write');
-$webroot = OEGlobalsBag::getInstance()->getWebRoot();
+$webroot = OpenEmr::webRoot();
 $moduleUrl = $webroot . Bootstrap::MODULE_INSTALLATION_PATH;
 
 $sourceLabels = [

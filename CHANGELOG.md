@@ -1,7 +1,8 @@
 # Changelog
 
-## 0.8.3 (2026-10-25)
+## 0.8.3 (unreleased)
 
+- **Fixed: on OpenEMR 7.0.4 and 8.0.0 to 8.0.0.3, enabling this module stopped every OpenEMR page, the login page included (HTTP 500).** Those releases have `OEGlobalsBag` without the getters its bootstrap called, which came with 8.1.0. The module needs 8.1.0 or later (its pages use 8.1's session and service container), so on an older release it now stays switched off, as it already did before 7.0.4. Its pages ask openhealthcare-common 1.3.2, now required at runtime, for the web root and OpenEMR's folders. Checked on fresh installs of the official 7.0.2, 7.0.4 and 8.0.0 images with every module enabled, and on 8.4.1 and master.
 - **A screen saved before OpenEMR 8.5.0 shows its visit's site and provider again.** Before 8.5.0, OpenEMR stored a questionnaire's visit number wrong (only the leading digits of the visit's id, or 0; fixed in core by #14654, and rows saved before aren't repaired), so screening follow-up and social needs rows from those saves came with no site or provider. The visit is now read from the questionnaire form's own record, which was always right, and from the response only when it has no form.
 - **A draft no longer counts as a finished screen.** OpenEMR's questionnaire runtime 0.4.0 (in 8.5.0 and later) saves a submitted response as `completed`, or `amended` when edited after; before it, every response was saved `in-progress`. Until a site has its first `completed` or `amended` response, every response counts, as before. After it, responses saved earlier count whatever their status, and later ones only when `completed` or `amended`. `entered-in-error` never counts. The rule is openhealthcare-common 1.3.0's `QuestionnaireStatus`, shared with the other modules that read screens.
 - **Help:** a **Help** link on the page opens the staff guide (GUIDE.md) for the installed version.

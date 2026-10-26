@@ -17,9 +17,9 @@ declare(strict_types=1);
 
 namespace OpenHealthcare\StaffWorklist\CareGaps;
 
-use OpenEMR\Core\OEGlobalsBag;
 use OpenHealthcare\StaffWorklist\Policy\PriorityPolicy;
 use OpenHealthcare\StaffWorklist\Repository\UpcomingVisits;
+use OpenHealthcare\Common\OpenEmr;
 
 final class CareGapRefresher
 {
@@ -34,7 +34,7 @@ final class CareGapRefresher
 
     public static function create(\DateTimeImmutable $now): self
     {
-        require_once OEGlobalsBag::getInstance()->getSrcDir() . '/clinical_rules.php';
+        require_once OpenEmr::srcDir() . '/clinical_rules.php';
         return new self(new UpcomingVisits($now), new CareGapCache(), new PriorityPolicy());
     }
 

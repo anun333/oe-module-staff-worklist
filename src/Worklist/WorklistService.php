@@ -35,6 +35,7 @@ use OpenHealthcare\StaffWorklist\Source\PriorAuthorizationSource;
 use OpenHealthcare\StaffWorklist\Source\SlidingFeeDueSource;
 use OpenHealthcare\StaffWorklist\Source\SocialNeedsSource;
 use OpenHealthcare\StaffWorklist\Source\WorkSourceInterface;
+use OpenHealthcare\Common\OpenEmr;
 
 final class WorklistService
 {
@@ -74,7 +75,7 @@ final class WorklistService
 
     public static function create(\DateTimeImmutable $now): self
     {
-        require_once OEGlobalsBag::getInstance()->getSrcDir() . '/options.inc.php';
+        require_once OpenEmr::srcDir() . '/options.inc.php';
 
         $policy = new PriorityPolicy();
         $sources = [
@@ -109,7 +110,7 @@ final class WorklistService
         }
         // Other modules' tabs: each module decides whether this user gets its tab.
         $event = new CollectSourcesEvent($now);
-        $kernel = OEGlobalsBag::getInstance()->getKernel();
+        $kernel = OpenEmr::kernel();
         if (is_object($kernel) && method_exists($kernel, 'getEventDispatcher')) {
             $kernel->getEventDispatcher()->dispatch($event, CollectSourcesEvent::EVENT_NAME);
         }
