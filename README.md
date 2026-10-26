@@ -2,7 +2,7 @@
 
 One queue of outstanding staff work across all patients, so nobody has to check four separate reports.
 
-**Status: 0.8.3, a pre-release.** Tested on OpenEMR with synthetic data only, access checks included (see [Compatibility](#compatibility)). It lists many patients' work on one page, so read [Access](#access) and [FOOTPRINT.md](FOOTPRINT.md) before installing, and try it with your own users and settings before giving staff access.
+**Status: 0.8.4, a pre-release.** Tested on OpenEMR with synthetic data only, access checks included (see [Compatibility](#compatibility)). It lists many patients' work on one page, so read [Access](#access) and [FOOTPRINT.md](FOOTPRINT.md) before installing, and try it with your own users and settings before giving staff access.
 
 Using the module day to day, tab by tab for each role: see [GUIDE.md](GUIDE.md), or the page's **Help** link, which opens the guide for the installed version.
 
