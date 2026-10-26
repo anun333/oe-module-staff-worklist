@@ -158,7 +158,8 @@ final class WorklistService
     /**
      * State saved before 0.8.6 under a key with no condition goes, once, to the item's key now
      * (LegacyKeys). Only for the sources this user's list has, so a source the user can't see keeps
-     * its rows until someone who can lists it.
+     * its rows until someone who can lists it, or until LegacyKeys::GRACE_DAYS after the first
+     * scan. Once no 0.8.5 rows are left, the scan never runs again.
      *
      * @param WorkItem[] $items
      * @param string[]   $keys
@@ -169,7 +170,26 @@ final class WorklistService
         if ($sources === []) {
             return;
         }
-        $legacy = $this->states->legacyKeys($sources);
+        $scan = $this->states->legacyScan();
+        if ($scan['done']) {
+            return;
+        }
+        $all = $this->states->legacyStates(LegacyKeys::SOURCES);
+        $decision = LegacyKeys::scanDecision(count($all), $scan['firstScan'], new \DateTimeImmutable());
+        if ($decision === LegacyKeys::DONE || $decision === LegacyKeys::EXPIRE) {
+            foreach (array_keys($all) as $key) {
+                $this->states->drop($key, $userId);
+            }
+            $this->states->markLegacyScan('legacy-done', $userId);
+            return;
+        }
+        if ($scan['firstScan'] === null) {
+            $this->states->markLegacyScan('legacy-start', $userId);
+        }
+        $legacy = array_filter(
+            $all,
+            static fn(ItemState $s): bool => in_array(explode(':', $s->key, 2)[0], $sources, true),
+        );
         if ($legacy === []) {
             return;
         }
@@ -177,9 +197,16 @@ final class WorklistService
         $stated = array_fill_keys(array_keys($this->states->findByKeys(
             array_map(static fn(WorkItem $i): string => (string)$i->key, $mine)
         )), true);
-        $plan = LegacyKeys::plan($mine, $legacy, $stated);
+        $dismissedAt = [];
+        foreach ($legacy as $key => $state) {
+            if ($state->status === ItemState::STATUS_DISMISSED) {
+                $dismissedAt[$key] = $state->updatedAt;
+            }
+        }
+        $plan = LegacyKeys::plan($mine, array_keys($legacy), $stated, $dismissedAt);
+        $reopen = array_fill_keys($plan['reopen'], true);
         foreach ($plan['moves'] as $from => $to) {
-            $this->states->rekey($from, $to, $userId);
+            $this->states->rekey($from, $to, $userId, isset($reopen[$from]));
         }
         foreach ($plan['drops'] as $key) {
             $this->states->drop($key, $userId);

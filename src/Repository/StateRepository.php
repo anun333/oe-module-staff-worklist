@@ -45,38 +45,83 @@ final class StateRepository
         return $this->findByKeys([$key])[$key] ?? null;
     }
 
+    /** The log key the 0.8.5-key scan records its first run and its end under (never an item key). */
+    public const LEGACY_MARKER = '_legacy_keys';
+
     /**
-     * Keys saved before 0.8.6 for these sources (LegacyKeys::SOURCES): the ones with no condition.
+     * State saved before 0.8.6 for these sources (LegacyKeys::SOURCES): the keys with no condition.
      *
      * @param string[] $sources
-     * @return string[]
+     * @return array<string, ItemState> keyed by item key
      */
-    public function legacyKeys(array $sources): array
+    public function legacyStates(array $sources): array
     {
         $rows = QueryUtils::fetchRecords(
-            'SELECT `item_key` FROM `staff_worklist_state` WHERE `item_key` REGEXP ?',
+            'SELECT * FROM `staff_worklist_state` WHERE `item_key` REGEXP ?',
             [LegacyKeys::pattern($sources)],
         );
-        return array_map(static fn(array $r): string => (string)$r['item_key'], $rows);
+        $states = [];
+        foreach ($rows as $row) {
+            $state = self::fromRow($row);
+            $states[$state->key] = $state;
+        }
+        return $states;
     }
 
     /**
-     * Moves a row's state to another key, logged as "rekey" with the state it carried. Does nothing
-     * if the row has gone or the new key already has a row.
+     * Where the 0.8.5-key scan stands, from the log: when it first ran, and whether it has ended.
+     *
+     * @return array{firstScan: ?\DateTimeImmutable, done: bool}
      */
-    public function rekey(string $from, string $to, int $userId): void
+    public function legacyScan(): array
     {
-        QueryUtils::inTransaction(function () use ($from, $to, $userId): void {
+        $rows = QueryUtils::fetchRecords(
+            'SELECT `action`, `created_at` FROM `staff_worklist_log` WHERE `item_key` = ? ORDER BY `id`',
+            [self::LEGACY_MARKER],
+        );
+        $first = null;
+        $done = false;
+        foreach ($rows as $row) {
+            if ($row['action'] === 'legacy-start' && $first === null) {
+                $first = new \DateTimeImmutable((string)$row['created_at']);
+            }
+            if ($row['action'] === 'legacy-done') {
+                $done = true;
+            }
+        }
+        return ['firstScan' => $first, 'done' => $done];
+    }
+
+    /** Records the scan's first run ("legacy-start") or its end ("legacy-done") in the log. */
+    public function markLegacyScan(string $action, int $userId): void
+    {
+        QueryUtils::sqlInsert(
+            "INSERT INTO `staff_worklist_log` (`item_key`, `pid`, `action`, `status`, `note`, `user_id`)
+             VALUES (?, 0, ?, '', '', ?)",
+            [self::LEGACY_MARKER, $action, $userId],
+        );
+    }
+
+    /**
+     * Moves a row's state to another key, logged as "rekey" with the state it carried. With
+     * $reopen, a dismissal isn't carried: the row opens, logged as "rekey-reopen". Does nothing if
+     * the row has gone or the new key already has a row.
+     */
+    public function rekey(string $from, string $to, int $userId, bool $reopen = false): void
+    {
+        QueryUtils::inTransaction(function () use ($from, $to, $userId, $reopen): void {
             if ($this->find($to) !== null || $this->find($from) === null) {
                 return;
             }
             QueryUtils::sqlStatementThrowException(
-                'UPDATE `staff_worklist_state` SET `item_key` = ?, `updated_by` = ? WHERE `item_key` = ?',
+                $reopen
+                    ? "UPDATE `staff_worklist_state` SET `item_key` = ?, `updated_by` = ?, `status` = 'open', `snooze_until` = NULL WHERE `item_key` = ?"
+                    : 'UPDATE `staff_worklist_state` SET `item_key` = ?, `updated_by` = ? WHERE `item_key` = ?',
                 [$to, $userId, $from],
             );
             $state = $this->find($to);
             if ($state !== null) {
-                $this->log($state, 'rekey', $userId);
+                $this->log($state, $reopen ? 'rekey-reopen' : 'rekey', $userId);
             }
         });
     }

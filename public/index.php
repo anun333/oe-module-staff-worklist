@@ -27,6 +27,7 @@ use OpenHealthcare\StaffWorklist\Model\ItemKey;
 use OpenHealthcare\StaffWorklist\Model\ItemState;
 use OpenHealthcare\StaffWorklist\Model\SiteAccess;
 use OpenHealthcare\StaffWorklist\Model\WorkItem;
+use OpenHealthcare\StaffWorklist\PageLanguage;
 use OpenHealthcare\StaffWorklist\Policy\PriorityPolicy;
 use OpenHealthcare\StaffWorklist\Worklist\WorklistFilter;
 use OpenHealthcare\StaffWorklist\Worklist\WorklistRow;
@@ -192,8 +193,8 @@ if ($service->sites->isRestrictionEnabled()) {
 }
 ?>
 <!DOCTYPE html>
-<?php // The module's own text is written in English. ?>
-<html lang="en">
+<?php // The page speaks the user's OpenEMR language: most of its text goes through xlt(). ?>
+<html lang="<?php echo attr(PageLanguage::lang()); ?>" dir="<?php echo attr(PageLanguage::dir()); ?>">
 <head>
     <title><?php echo xlt('Worklist'); ?></title>
     <?php Header::setupHeader(['common']); ?>

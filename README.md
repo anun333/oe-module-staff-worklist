@@ -195,7 +195,7 @@ From the OpenEMR directory:
 composer require anun333/oe-module-staff-worklist
 ```
 
-The installer plugin places it in `interface/modules/custom_modules/oe-module-staff-worklist/`. Without Composer, copy this directory there instead.
+The installer plugin places it in `interface/modules/custom_modules/oe-module-staff-worklist/`. Without Composer, copy this directory there instead. A copied module carries its own `vendor/anun333/openhealthcare-common`; every module copied this way must carry the same version of it, because the first module to load serves its copy to all of them (Composer keeps one copy for the site, so this applies to copies only).
 
 Then go to Modules › Manage Modules › Unregistered, and **Register**, **Install** and **Enable** it. A **Worklist** menu entry appears next to Messages. Enabling it also switches on the background service for care gaps; disabling switches it off.
 
@@ -231,6 +231,8 @@ The same six are worth repeating in your own install, with your own groups and f
 
 ## Compatibility
 
+**Floors.** The module needs OpenEMR 8.1.0 or later and PHP 8.2 or later. On older OpenEMR it stays switched off rather than stop OpenEMR's pages (below).
+
 **PHP security.** PHP's php2shell advisory (2026-10-21; CVE-2026-109618 and CVE-2026-109619) is remote code execution without logging in, and it is being exploited. Run OpenEMR on PHP 8.2.35, 8.3.36, 8.4.27, 8.5.12 or later, whatever the module needs. The official OpenEMR 7.0.2 and 7.0.3 Docker images can't get that fix: they carry PHP 8.2.16 and 8.3.15 on Alpine releases that no longer get updates. Run 7.0 only on a patched PHP, or upgrade OpenEMR. OpenEMR rebuilt its 8.4.1, 8.3.0, 8.2.0 and 8.0.0.3 images with the fix on 2026-10-22 (forum t/27157); a container started before then needs pulling again.
 
 **Older OpenEMR:** on 7.0.3 and older (no `OEGlobalsBag`), the module stays switched off rather than stop OpenEMR's pages; checked on fresh 7.0.2 and 7.0.3 installs with every module enabled. On fresh official 8.1.0, 8.3.0 and 8.5.0 images (2026-10-23) it installs through Module Manager and its pages that need no patient load, with every module enabled and with it alone (`dev/module_compat_check.sh`). 7.0.4 to 8.0 haven't been tried.
@@ -259,7 +261,7 @@ php tools/footprint.php          # regenerate FOOTPRINT.md after changing the mo
 php tools/footprint.php --check  # what CI runs
 ```
 
-The unit tests need no database or OpenEMR install. CI runs them, and the footprint check, on PHP 8.3, 8.4 and 8.5.
+The unit tests need no database or OpenEMR install. CI runs them, and the footprint check, on PHP 8.2, 8.3, 8.4 and 8.5.
 
 ## Known limitations
 
@@ -295,3 +297,7 @@ From the same project. Each installs with `composer require anun333/<module>` an
 ## License
 
 GPL-3.0-or-later, as OpenEMR. See [LICENSE](LICENSE).
+
+The screening and social needs tabs read questionnaires by their LOINC codes, and this README names them:
+
+> This material contains content from LOINC (http://loinc.org). LOINC is copyright © Regenstrief Institute, Inc. and the Logical Observation Identifiers Names and Codes (LOINC) Committee and is available at no cost under the license at http://loinc.org/license. LOINC® is a registered United States trademark of Regenstrief Institute, Inc.
