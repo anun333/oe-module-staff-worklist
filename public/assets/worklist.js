@@ -229,6 +229,47 @@
         });
     }
 
+    // Tabs with no count kept from the last 10 minutes are counted after the page loads, one at a
+    // time, so a slow tab never holds up the page. The All tab's count waits for every tab's.
+    const allCount = document.querySelector('#worklist-tab-all .badge');
+    const tabCounts = Array.from(document.querySelectorAll('.js-tab-count'));
+    function showTotal() {
+        if (allCount && tabCounts.every(function (badge) {
+            return badge.dataset.count !== undefined;
+        })) {
+            allCount.textContent = String(tabCounts.reduce(function (sum, badge) {
+                return sum + Number(badge.dataset.count);
+            }, 0));
+        }
+    }
+    tabCounts.filter(function (badge) {
+        return badge.dataset.source !== undefined;
+    }).reduce(function (previous, badge) {
+        return previous.then(function () {
+            const params = new URLSearchParams(Object.assign({source: badge.dataset.source}, cfg.countFilter));
+            top.restoreSession();
+            return fetch(cfg.countsUrl + '?' + params.toString(), {credentials: 'same-origin'})
+                .then(function (response) {
+                    return response.json();
+                })
+                .then(function (data) {
+                    if (!data.ok) {
+                        throw new Error(data.error);
+                    }
+                    badge.dataset.count = String(data.count);
+                    badge.textContent = String(data.count);
+                    showTotal();
+                })
+                .catch(function () {
+                    badge.textContent = '?';
+                    badge.title = cfg.text.countFailed;
+                    if (allCount) {
+                        allCount.textContent = '?';
+                    }
+                });
+        });
+    }, Promise.resolve());
+
     if (form) {
         form.addEventListener('submit', function (event) {
             event.preventDefault();

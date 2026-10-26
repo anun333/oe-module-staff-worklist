@@ -181,6 +181,32 @@ The tab lists claims that need billing staff, at most one row per visit:
 
 Telling a line denial from a contractual write-off uses OpenEMR's own rule: on a line paid nothing, any adjustment other than 45 or 59 is a denial. OpenEMR doesn't store the group code with a posted adjustment, so a PI-45 counts as contractual here too.
 
+## Tab counts
+
+A page collects only the tab it shows, plus **Results to sign**, whose overdue critical results the red banner counts on every tab (0.8.7). The **All** tab collects every tab. Before 0.8.7 every page collected every tab, so each tab took as long as all of them together.
+
+The other tabs' counts are kept for 10 minutes, per user and per choice of **Mine**/**Unassigned**/**Everyone**, **Open**/**Snoozed**/**Dismissed** and sites:
+
+- A tab counted in the last 10 minutes shows that count. Hovering over it shows when it was counted, and a line under the list gives the oldest count's time.
+- A tab not counted in that time shows **…** and is counted after the page loads, one tab at a time (`public/counts.php`). The **All** count appears once every tab's count is known.
+- Opening a tab counts it again, and so does the **All** tab for every tab.
+- Assigning, snoozing, dismissing or reopening an item through the worklist drops every user's kept count for that tab.
+
+So work done elsewhere in OpenEMR, such as a result signed or a claim paid, reaches another tab's count within 10 minutes, or as soon as the tab is opened. The rows shown are always collected when the page loads.
+
+The **Sites** menu's counts are for the tab shown, or for every tab on **All**.
+
+On a synthetic copy with 20,000 patients, 200,000 visits, 195,327 claims and 15,384 PHQ-9 responses, timed on the command line with Revenue Cycle's tab left out:
+
+| Page | 0.8.6 | 0.8.7 |
+|---|---|---|
+| Results to sign | 53.2 s | 0.6 s |
+| Screening follow-up | 52.7 s | 1.9 s |
+| Social needs follow-up | 49.3 s | 0.8 s |
+| Claims follow-up (61,430 items) | 48.7 s | 4.8 s |
+| Sliding fee re-assessments (15,566 items) | 49.0 s | 4.4 s |
+| All | about 50 s | 12.4 s |
+
 ## Care gaps run in the background
 
 OpenEMR's rules engine takes about 150 ms per patient, which is too slow to run when the page loads. The background service **Staff Worklist care gaps** (Admin › Config › Background Services) runs every 10 minutes while someone is logged in or from cron, and caches the results. The schedule itself is read live, so a cancelled visit drops off immediately. The page shows when gaps were last checked, and **Check now** runs the job on demand.
@@ -199,7 +225,7 @@ The installer plugin places it in `interface/modules/custom_modules/oe-module-st
 
 Then go to Modules › Manage Modules › Unregistered, and **Register**, **Install** and **Enable** it. A **Worklist** menu entry appears next to Messages. Enabling it also switches on the background service for care gaps; disabling switches it off.
 
-What installing it adds and changes, extracted from the source, is in [FOOTPRINT.md](FOOTPRINT.md): three tables of its own, one row in `background_services`, no change to any core table's structure, no outbound network.
+What installing it adds and changes, extracted from the source, is in [FOOTPRINT.md](FOOTPRINT.md): four tables of its own, one row in `background_services`, one index on a core table, and no outbound network. The index (0.8.7) is on `form_questionnaire_assessments.response_id`, which core leaves unindexed; the UDS, Title X and CCBHC report modules add the same index under the same name, `response_id`, so whichever module installs first creates it and the others leave it. Removing the module leaves it in place.
 
 ## Access
 
@@ -280,6 +306,8 @@ The unit tests need no database or OpenEMR install. CI runs them, and the footpr
 - The PHQ-4's 0 to 12 total isn't followed up on its own: its authors give it no cut-off for screening, only one for each part.
 - Claims follow-up shows how long ago a claim was denied rather than an appeal deadline, since those differ by payer. On 8.4.1 and later, a line OpenEMR refused to post is found only through the insurance it left open; the remittance itself names the line.
 - At most 300 rows are shown at once, most urgent first.
+- A tab's count, and its rows, are collected from every outstanding item it has, so its time and memory grow with them. In testing, 61,430 open claims took 4.8 seconds and about 250 MB, under OpenEMR's usual 512 MB memory limit. A site with well over 100,000 claims open in the 365-day window would pass it on the claims tab.
+- The counts on tabs other than the one shown can be up to 10 minutes old; see [Tab counts](#tab-counts).
 
 ## Other modules for OpenEMR
 

@@ -111,7 +111,7 @@ final class SocialNeedsSource implements WorkSourceInterface
                 fe.facility_id AS site_id, fe.sensitivity, " . PatientRef::SQL_COLUMNS . "
             FROM questionnaire_response AS qr
             JOIN patient_data AS pd ON pd.pid = qr.patient_id
-            LEFT JOIN questionnaire_repository AS rep ON rep.id = qr.questionnaire_foreign_id" . ResponseVisit::JOINS . "
+            LEFT JOIN questionnaire_repository AS rep ON rep.id = qr.questionnaire_foreign_id" . ResponseVisit::joins() . "
             WHERE qr.create_time >= ?
               AND (COALESCE(NULLIF(qr.questionnaire, ''), rep.questionnaire) LIKE ? OR COALESCE(NULLIF(qr.questionnaire, ''), rep.questionnaire) LIKE ?)
               AND NOT EXISTS (

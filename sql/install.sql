@@ -50,6 +50,25 @@ CREATE TABLE `staff_worklist_caregap_cache` (
 ) ENGINE=InnoDB COMMENT='Staff Worklist: rules-engine reminders for scheduled patients, refreshed in the background';
 #EndIf
 
+#IfNotTable staff_worklist_count
+CREATE TABLE `staff_worklist_count` (
+    `user_id` BIGINT NOT NULL,
+    `filter_key` VARCHAR(191) NOT NULL COMMENT 'view|scope|sites the count was taken for',
+    `source` VARCHAR(32) NOT NULL,
+    `item_count` INT NOT NULL,
+    `counted_at` DATETIME NOT NULL,
+    PRIMARY KEY (`user_id`, `filter_key`, `source`),
+    KEY `idx_counted_at` (`counted_at`)
+) ENGINE=InnoDB COMMENT='Staff Worklist: tab counts per user, kept 10 minutes so a page collects only the tab it shows';
+#EndIf
+
+-- The screening and social needs tabs find each response's visit through form_questionnaire_assessments.response_id,
+-- which core leaves unindexed (a TEXT column); without an index, every lookup reads the whole table. Other modules
+-- add the same index under the same name, so whichever runs first creates it.
+#IfNotIndex form_questionnaire_assessments response_id
+ALTER TABLE `form_questionnaire_assessments` ADD INDEX `response_id` (`response_id`(64));
+#EndIf
+
 -- Inactive until the module is enabled; ModuleManagerListener switches it on and off.
 #IfNotRow background_services name StaffWorklistCareGaps
 INSERT INTO `background_services` (`name`, `title`, `active`, `running`, `next_run`, `execute_interval`, `function`, `require_once`, `sort_order`)

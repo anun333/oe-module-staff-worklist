@@ -15,6 +15,8 @@ It opens on **Mine** and **Open**.
 - **Open**, **Snoozed** or **Dismissed**: which items.
 - **Sites**: tick sites and choose **Apply**, or **All sites**. Your choice is remembered.
 - The tabs: **All**, then one for each kind of work, with counts. You see only the tabs your permissions allow.
+  - The tab you're on is counted when the page opens. The others may show a count from up to 10 minutes ago: hover over one to see when it was counted, and the line under the list gives the oldest. **…** means the tab is being counted.
+  - The numbers in the **Sites** menu are for the tab you're on.
 
 Each row shows its **Priority** (**Critical**, **High** or **Normal**), the **Patient**, the **Site**, the **Work**, how long it has been **Waiting**, and who it is **Assigned** to. Click the patient's name to open the chart. The button on the right opens the screen where the work is done.
 

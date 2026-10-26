@@ -29,6 +29,7 @@ use OpenHealthcare\StaffWorklist\Model\SiteAccess;
 use OpenHealthcare\StaffWorklist\Model\WorkItem;
 use OpenHealthcare\StaffWorklist\PageLanguage;
 use OpenHealthcare\StaffWorklist\Policy\PriorityPolicy;
+use OpenHealthcare\StaffWorklist\Worklist\TabCounts;
 use OpenHealthcare\StaffWorklist\Worklist\WorklistFilter;
 use OpenHealthcare\StaffWorklist\Worklist\WorklistRow;
 use OpenHealthcare\StaffWorklist\Worklist\WorklistService;
@@ -57,6 +58,11 @@ if ($requestedSites !== false) {
 $filter = $filter->withSites($selectedSites);
 
 $result = $service->build($filter, $now);
+// Only this tab (and results to sign, for the banner) was collected. Other tabs show the count kept
+// from the last TabCounts::TTL_MINUTES, or "…" until the page counts them (public/counts.php).
+$tabCounts = $service->tabCounts($filter, $result, $now);
+$allCount = TabCounts::total($tabCounts);
+$countsAsOf = TabCounts::oldest($tabCounts);
 $careGapStatus = $service->careGapStatus();
 // OpenEMR 8.2.0 to 8.4.1 ran another site's background jobs against the default site (#14359).
 $multisiteNote = MultisiteNote::applies(OpenEmr::siteDir(), OpenEmr::version(), $careGapStatus['oldestCheck'], $careGapStatus['unchecked'], new \DateTimeImmutable());
@@ -267,9 +273,15 @@ if ($service->sites->isRestrictionEnabled()) {
 
     <ul class="nav nav-tabs mb-0">
         <li class="nav-item">
-            <a class="nav-link <?php echo $filter->source === null ? 'active' : ''; ?>"
+            <a class="nav-link <?php echo $filter->source === null ? 'active' : ''; ?>" id="worklist-tab-all"
                href="<?php echo attr($link(['source' => null])); ?>">
-                <?php echo xlt('All'); ?> <span class="badge badge-pill badge-secondary"><?php echo text((string)$result->total()); ?></span>
+                <?php echo xlt('All'); ?> <span class="badge badge-pill badge-secondary"><?php
+                if ($allCount === null) {
+                    ?>…<span class="sr-only"> (<?php echo xlt('counting'); ?>)</span><?php
+                } else {
+                    echo text((string)$allCount);
+                }
+                ?></span>
             </a>
         </li>
         <?php foreach ($sourceLabels as $source => $label) { ?>
@@ -277,7 +289,15 @@ if ($service->sites->isRestrictionEnabled()) {
                 <a class="nav-link <?php echo $filter->source === $source ? 'active' : ''; ?>"
                    href="<?php echo attr($link(['source' => $source])); ?>">
                     <?php echo text($label); ?>
-                    <span class="badge badge-pill badge-secondary"><?php echo text((string)($result->countsBySource[$source] ?? 0)); ?></span>
+                    <?php $tabCount = $tabCounts[$source] ?? ['count' => null, 'countedAt' => null, 'fresh' => false]; ?>
+                    <?php if ($tabCount['count'] === null) { ?>
+                        <span class="badge badge-pill badge-secondary js-tab-count" data-source="<?php echo attr($source); ?>">…<span class="sr-only"> (<?php echo xlt('counting'); ?>)</span></span>
+                    <?php } else { ?>
+                        <span class="badge badge-pill badge-secondary js-tab-count" data-count="<?php echo attr((string)$tabCount['count']); ?>"
+                            <?php if (!$tabCount['fresh'] && $tabCount['countedAt'] !== null) { ?>
+                                title="<?php echo xla('Counted at'); ?> <?php echo attr(oeFormatTime($tabCount['countedAt']->format('H:i:s'))); ?>"
+                            <?php } ?>><?php echo text((string)$tabCount['count']); ?></span>
+                    <?php } ?>
                 </a>
             </li>
         <?php } ?>
@@ -424,6 +444,12 @@ if ($service->sites->isRestrictionEnabled()) {
         <?php } ?>
     <?php } ?>
 
+    <?php if ($countsAsOf !== null) { ?>
+        <p class="small text-muted mt-3 mb-0">
+            <?php echo xlt('Counts on the other tabs are from'); ?> <?php echo text(oeFormatTime($countsAsOf->format('H:i:s'))); ?>.
+            <?php echo xlt('A tab is counted again when you open it, or once its count is 10 minutes old.'); ?>
+        </p>
+    <?php } ?>
     <p class="small text-muted mt-3 mb-0">
         <?php echo xlt('Items leave this list when the work is done in OpenEMR. Snooze and dismiss only hide an item here; they do not change the chart. Unsigned results cannot be dismissed, and critical results cannot be snoozed.'); ?>
     </p>
@@ -475,6 +501,9 @@ if ($service->sites->isRestrictionEnabled()) {
     window.staffWorklist = {
         webroot: <?php echo js_escape($webroot); ?>,
         actionUrl: <?php echo js_escape($moduleUrl . '/public/action.php'); ?>,
+        countsUrl: <?php echo js_escape($moduleUrl . '/public/counts.php'); ?>,
+        // what the tab counts are for: the page's view, scope and sites
+        countFilter: <?php echo json_encode(['view' => $filter->view, 'scope' => $filter->scope, 'sites' => $selectedSites === null ? 'all' : implode(',', $selectedSites)]); ?>,
         // user id => site ids they may reach (null = all); null overall when sites are not restricted
         assigneeSites: <?php echo json_encode($assigneeSites === null ? null : (object)$assigneeSites); ?>,
         // user id => sensitivity levels (among those on this page) the user holds
@@ -490,7 +519,8 @@ if ($service->sites->isRestrictionEnabled()) {
             snoozeMax: <?php echo xlj('At most'); ?>,
             days: <?php echo xlj('days from today'); ?>,
             saveFailed: <?php echo xlj('Could not save. Reload the page and try again.'); ?>,
-            checking: <?php echo xlj('Checking'); ?>
+            checking: <?php echo xlj('Checking'); ?>,
+            countFailed: <?php echo xlj('Could not count this tab. Open it to see its items.'); ?>
         }
     };
 </script>

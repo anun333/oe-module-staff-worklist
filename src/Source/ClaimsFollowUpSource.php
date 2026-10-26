@@ -32,6 +32,9 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
 {
     private readonly ClaimRules $rules;
 
+    /** @var array<string, string> each string translated once per request (see xl()) */
+    private array $translated = [];
+
     public function __construct(
         PriorityPolicy $policy,
         private readonly \DateTimeImmutable $now,
@@ -156,22 +159,22 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
      */
     private function toItem(ClaimRecord $claim, array $decision, array $row): WorkItem
     {
-        $payer = $claim->payer !== '' ? $claim->payer : xl('the insurer');
-        $facts = [xl('Service date') . ' ' . oeFormatShortDate(substr((string)($row['service_date'] ?? ''), 0, 10))];
+        $payer = $claim->payer !== '' ? $claim->payer : $this->xl('the insurer');
+        $facts = [$this->xl('Service date') . ' ' . oeFormatShortDate(substr((string)($row['service_date'] ?? ''), 0, 10))];
         $title = match ($decision['kind']) {
-            ClaimRules::DENIED => xl('Claim denied by') . ' ' . $payer,
-            ClaimRules::NO_RESPONSE => xl('No response from') . ' ' . $payer . ' ' . xl('in') . ' '
-                . PriorityPolicy::ageDays($decision['since'], $this->now) . ' ' . xl('days'),
-            ClaimRules::WRITTEN_OFF => xl('Line written off with a denial reason by') . ' ' . $payer,
-            ClaimRules::UPLOAD_FAILED => xl('Claim file not sent to') . ' ' . self::partner($claim),
-            ClaimRules::NOT_SENT => xl('Claim file still waiting to be sent to') . ' ' . self::partner($claim) . ' ' . xl('after') . ' '
-                . PriorityPolicy::ageHours($decision['since'], $this->now) . ' ' . xl('hours'),
-            ClaimRules::PARTLY_POSTED => xl('Remittance posted, insurance still open after') . ' '
-                . PriorityPolicy::ageDays($decision['since'], $this->now) . ' ' . xl('days'),
-            default => xl('Flagged for follow-up'),
+            ClaimRules::DENIED => $this->xl('Claim denied by') . ' ' . $payer,
+            ClaimRules::NO_RESPONSE => $this->xl('No response from') . ' ' . $payer . ' ' . $this->xl('in') . ' '
+                . PriorityPolicy::ageDays($decision['since'], $this->now) . ' ' . $this->xl('days'),
+            ClaimRules::WRITTEN_OFF => $this->xl('Line written off with a denial reason by') . ' ' . $payer,
+            ClaimRules::UPLOAD_FAILED => $this->xl('Claim file not sent to') . ' ' . self::partner($claim),
+            ClaimRules::NOT_SENT => $this->xl('Claim file still waiting to be sent to') . ' ' . self::partner($claim) . ' ' . $this->xl('after') . ' '
+                . PriorityPolicy::ageHours($decision['since'], $this->now) . ' ' . $this->xl('hours'),
+            ClaimRules::PARTLY_POSTED => $this->xl('Remittance posted, insurance still open after') . ' '
+                . PriorityPolicy::ageDays($decision['since'], $this->now) . ' ' . $this->xl('days'),
+            default => $this->xl('Flagged for follow-up'),
         };
         if ($decision['kind'] === ClaimRules::DENIED) {
-            $facts[] = xl('Denied') . ' ' . oeFormatShortDate($decision['since']->format('Y-m-d'));
+            $facts[] = $this->xl('Denied') . ' ' . oeFormatShortDate($decision['since']->format('Y-m-d'));
             $descriptions = BillingUtilities::CLAIM_ADJUSTMENT_REASON_CODES;
             $reasons = ClaimRules::parseReasons($claim->reasons);
             foreach ($reasons as $r) {
@@ -180,38 +183,38 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
                 $facts[] = $line . (is_string($description) ? ' ' . ClaimRules::shortDescription($description) : '');
             }
             if ($reasons === []) {
-                $facts[] = xl('No reason recorded');
+                $facts[] = $this->xl('No reason recorded');
             }
         } elseif ($decision['kind'] === ClaimRules::WRITTEN_OFF) {
             $descriptions = BillingUtilities::CLAIM_ADJUSTMENT_REASON_CODES;
             foreach ($claim->writeOffs as $w) {
                 $description = $descriptions[$w['reason']] ?? null;
-                $facts[] = $w['code'] . ': ' . xl('reason') . ' ' . $w['reason'] . (is_string($description) ? ' ' . ClaimRules::shortDescription($description) : '')
-                    . ', ' . sprintf('%.2f', $w['amount']) . ' ' . xl('written off') . ' ' . oeFormatShortDate($w['at']->format('Y-m-d'));
+                $facts[] = $w['code'] . ': ' . $this->xl('reason') . ' ' . $w['reason'] . (is_string($description) ? ' ' . ClaimRules::shortDescription($description) : '')
+                    . ', ' . sprintf('%.2f', $w['amount']) . ' ' . $this->xl('written off') . ' ' . oeFormatShortDate($w['at']->format('Y-m-d'));
             }
         } elseif ($decision['kind'] === ClaimRules::PARTLY_POSTED) {
-            $facts[] = xl('Last posted') . ' ' . oeFormatShortDate($decision['since']->format('Y-m-d'));
-            $facts[] = xl('A line OpenEMR could not post stops the rest of the claim from posting and leaves the insurance open');
+            $facts[] = $this->xl('Last posted') . ' ' . oeFormatShortDate($decision['since']->format('Y-m-d'));
+            $facts[] = $this->xl('A line OpenEMR could not post stops the rest of the claim from posting and leaves the insurance open');
         } elseif (in_array($decision['kind'], [ClaimRules::UPLOAD_FAILED, ClaimRules::NOT_SENT], true) && $claim->upload !== null) {
             $upload = $claim->upload;
-            $facts[] = xl('Queued') . ' ' . oeFormatShortDate($upload['at']->format('Y-m-d'));
+            $facts[] = $this->xl('Queued') . ' ' . oeFormatShortDate($upload['at']->format('Y-m-d'));
             if ($decision['kind'] === ClaimRules::UPLOAD_FAILED) {
-                $facts[] = xl('Upload status') . ' ' . $upload['status'];
+                $facts[] = $this->xl('Upload status') . ' ' . $upload['status'];
             }
             if ($upload['file'] !== '') {
-                $facts[] = xl('File') . ' ' . $upload['file'];
+                $facts[] = $this->xl('File') . ' ' . $upload['file'];
             }
             if ($upload['message'] !== '') {
                 $facts[] = $upload['message'];
             }
             if ($decision['kind'] === ClaimRules::NOT_SENT) {
-                $facts[] = xl('The SFTP background service may not be running');
+                $facts[] = $this->xl('The SFTP background service may not be running');
             }
         } elseif ($decision['kind'] === ClaimRules::NO_RESPONSE && $claim->versionTime !== null) {
-            $facts[] = xl('Billed') . ' ' . oeFormatShortDate($claim->versionTime->format('Y-m-d'));
+            $facts[] = $this->xl('Billed') . ' ' . oeFormatShortDate($claim->versionTime->format('Y-m-d'));
         }
         foreach ($claim->flags as $flag) {
-            $facts[] = xl('Flagged') . ' ' . oeFormatShortDate($flag['at']->format('Y-m-d')) . ($flag['note'] !== '' ? ': ' . $flag['note'] : '');
+            $facts[] = $this->xl('Flagged') . ' ' . oeFormatShortDate($flag['at']->format('Y-m-d')) . ($flag['note'] !== '' ? ': ' . $flag['note'] : '');
         }
 
         $tracker = in_array($decision['kind'], [ClaimRules::UPLOAD_FAILED, ClaimRules::NOT_SENT], true);
@@ -225,7 +228,7 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
             priority: $decision['priority'],
             since: $decision['since'],
             ownerId: null,
-            actionLabel: $tracker ? xl('Open claim file tracker') : xl('Open posting'),
+            actionLabel: $tracker ? $this->xl('Open claim file tracker') : $this->xl('Open posting'),
             actionUrl: $tracker ? '/interface/billing/billing_tracker.php' : '/interface/billing/sl_eob_invoice.php?id=' . (int)$row['fe_id'],
             actionMode: 'window',
             dismissible: true,
@@ -256,6 +259,16 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
             WHERE r.created_at >= ?",
             [$since]
         ));
+    }
+
+    /**
+     * OpenEMR's xl(), once per string: a site with tens of thousands of open claims made each
+     * page translate the same few labels hundreds of thousands of times (5.5 of 9.5 seconds for
+     * 61,430 claims).
+     */
+    private function xl(string $text): string
+    {
+        return $this->translated[$text] ??= xl($text);
     }
 
     private static function partner(ClaimRecord $claim): string

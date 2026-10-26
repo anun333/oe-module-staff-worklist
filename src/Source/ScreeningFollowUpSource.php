@@ -77,7 +77,7 @@ final class ScreeningFollowUpSource implements WorkSourceInterface
                 " . PatientRef::SQL_COLUMNS . "
             FROM questionnaire_response AS qr
             JOIN patient_data AS pd ON pd.pid = qr.patient_id
-            LEFT JOIN questionnaire_repository AS rep ON rep.id = qr.questionnaire_foreign_id" . ResponseVisit::JOINS . "
+            LEFT JOIN questionnaire_repository AS rep ON rep.id = qr.questionnaire_foreign_id" . ResponseVisit::joins() . "
             LEFT JOIN users AS ru ON qr.creator_user_id > 0 AND ru.id = qr.creator_user_id
             WHERE qr.create_time >= ?
               AND (" . implode(' OR ', $mentions) . ")

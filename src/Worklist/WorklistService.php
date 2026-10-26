@@ -21,6 +21,7 @@ use OpenHealthcare\StaffWorklist\Model\WorkItem;
 use OpenHealthcare\StaffWorklist\Policy\ActionRules;
 use OpenHealthcare\StaffWorklist\Policy\PriorityPolicy;
 use OpenHealthcare\StaffWorklist\Policy\SensitivityPolicy;
+use OpenHealthcare\StaffWorklist\Repository\CountRepository;
 use OpenHealthcare\StaffWorklist\Repository\SiteDirectory;
 use OpenHealthcare\StaffWorklist\Repository\StateRepository;
 use OpenHealthcare\StaffWorklist\Repository\UpcomingVisits;
@@ -65,6 +66,7 @@ final class WorklistService
         public readonly UserDirectory $users,
         public readonly SiteDirectory $sites,
         public readonly PriorityPolicy $policy = new PriorityPolicy(),
+        private readonly ?CountRepository $counts = null,
     ) {
         $byId = [];
         foreach ($sources as $source) {
@@ -128,6 +130,7 @@ final class WorklistService
             new UserDirectory(),
             new SiteDirectory(),
             $policy,
+            new CountRepository(),
         );
         $service->contributed = $contributed;
         return $service;
@@ -143,30 +146,110 @@ final class WorklistService
         return $this->contributed;
     }
 
+    /**
+     * The sources a page collects: every source on the All tab; otherwise the tab's own, plus
+     * results to sign, whose critical overdue results the banner counts on every tab.
+     *
+     * @param list<string> $available source ids this user has, in tab order
+     * @return list<string>
+     */
+    public static function sourcesToCollect(array $available, ?string $selected): array
+    {
+        if ($selected === null) {
+            return $available;
+        }
+        return array_values(array_filter(
+            $available,
+            static fn(string $id): bool => $id === $selected || $id === ItemKey::SOURCE_RESULT,
+        ));
+    }
+
+    /**
+     * The rows of the tab the filter picks, with counts for the sources collected for it
+     * (sourcesToCollect); the other tabs' counts come from tabCounts(). The site picker's counts
+     * are the tab's.
+     */
     public function build(WorklistFilter $filter, \DateTimeImmutable $today): WorklistResult
     {
+        $collected = self::sourcesToCollect(array_keys($this->sources), $filter->source);
         $items = [];
-        foreach ($this->sources as $source) {
-            array_push($items, ...$source->collect());
+        foreach ($collected as $id) {
+            array_push($items, ...$this->sources[$id]->collect());
         }
         $keys = array_map(static fn(WorkItem $i): string => (string)$i->key, $items);
-        $this->carryLegacyState($items, $keys, $filter->userId);
+        $this->carryLegacyState($items, $keys, $filter->userId, $collected);
         $states = $this->states->findByKeys($keys);
-        return $this->assembler->assemble($items, $states, $filter, $today, $this->sites->accessFor($filter->userId));
+        $access = $this->sites->accessFor($filter->userId);
+        if ($filter->source === null || $filter->source === ItemKey::SOURCE_RESULT) {
+            $result = $this->assembler->assemble($items, $states, $filter, $today, $access);
+            return new WorklistResult($result->rows, $result->countsBySource, $result->countsBySite, $result->overdueCount, $collected);
+        }
+        // Results to sign are collected on another tab only for the banner and their own count,
+        // so they're assembled apart and stay out of the tab's site counts.
+        $isResult = static fn(WorkItem $i): bool => $i->source() === ItemKey::SOURCE_RESULT;
+        $tab = $this->assembler->assemble(array_filter($items, static fn(WorkItem $i): bool => !$isResult($i)), $states, $filter, $today, $access);
+        $results = $this->assembler->assemble(array_filter($items, $isResult), $states, $filter, $today, $access);
+        return new WorklistResult(
+            $tab->rows,
+            $tab->countsBySource + $results->countsBySource,
+            $tab->countsBySite,
+            $tab->overdueCount + $results->overdueCount,
+            $collected,
+        );
+    }
+
+    /**
+     * One tab's count for the filter's view, scope and sites, collected now and kept for
+     * TabCounts::TTL_MINUTES. Null when this user doesn't have the tab.
+     */
+    public function countFor(string $source, WorklistFilter $filter, \DateTimeImmutable $today): ?int
+    {
+        if (!isset($this->sources[$source])) {
+            return null;
+        }
+        $items = $this->sources[$source]->collect();
+        $keys = array_map(static fn(WorkItem $i): string => (string)$i->key, $items);
+        $this->carryLegacyState($items, $keys, $filter->userId, [$source]);
+        $tabFilter = new WorklistFilter($filter->userId, $filter->view, $filter->scope, $source, $filter->sites);
+        $result = $this->assembler->assemble($items, $this->states->findByKeys($keys), $tabFilter, $today, $this->sites->accessFor($filter->userId));
+        $count = $result->countsBySource[$source] ?? 0;
+        $this->counts?->store($filter->userId, TabCounts::filterKey($filter), [$source => $count], $today);
+        return $count;
+    }
+
+    /**
+     * Every tab's count for the page: the tabs build() collected, counted now (and kept), and the
+     * others as last counted for this user within TabCounts::TTL_MINUTES, or null to count later.
+     *
+     * @return array<string, array{count: ?int, countedAt: ?\DateTimeImmutable, fresh: bool}> in tab order
+     */
+    public function tabCounts(WorklistFilter $filter, WorklistResult $result, \DateTimeImmutable $now): array
+    {
+        $fresh = TabCounts::fresh($result->collected, $result->countsBySource);
+        $key = TabCounts::filterKey($filter);
+        $cached = [];
+        if ($this->counts !== null) {
+            $this->counts->store($filter->userId, $key, $fresh, $now);
+            if (array_diff(array_keys($this->sources), $result->collected) !== []) {
+                $cached = $this->counts->forUser($filter->userId, $key);
+            }
+        }
+        return TabCounts::merge(array_keys($this->sources), $fresh, $cached, $now);
     }
 
     /**
      * State saved before 0.8.6 under a key with no condition goes, once, to the item's key now
-     * (LegacyKeys). Only for the sources this user's list has, so a source the user can't see keeps
-     * its rows until someone who can lists it, or until LegacyKeys::GRACE_DAYS after the first
-     * scan. Once no 0.8.5 rows are left, the scan never runs again.
+     * (LegacyKeys). Only for the sources collected ($collected), so a source the user can't see,
+     * or a tab not collected for this page, keeps its rows until a list that collects it, or until
+     * LegacyKeys::GRACE_DAYS after the first scan. Once no 0.8.5 rows are left, the scan never runs again.
      *
-     * @param WorkItem[] $items
-     * @param string[]   $keys
+     * @param WorkItem[]   $items
+     * @param string[]     $keys
+     * @param list<string> $collected source ids $items came from
      */
-    private function carryLegacyState(array $items, array $keys, int $userId): void
+    private function carryLegacyState(array $items, array $keys, int $userId, array $collected): void
     {
-        $sources = array_values(array_intersect(LegacyKeys::SOURCES, array_keys($this->sources)));
+        $sources = LegacyKeys::sourcesFor($collected);
         if ($sources === []) {
             return;
         }
@@ -336,6 +419,9 @@ final class WorklistService
         }
 
         $this->states->save($next, $action);
+        // Every user's kept count for this tab may have changed (an assignment moves the item to
+        // another user's Mine), so the tab is counted again on each user's next page.
+        $this->counts?->forget($key->source);
         return null;
     }
 }

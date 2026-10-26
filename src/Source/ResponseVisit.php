@@ -17,12 +17,18 @@ declare(strict_types=1);
 
 namespace OpenHealthcare\StaffWorklist\Source;
 
+use OpenEMR\Common\Database\QueryUtils;
+
 final class ResponseVisit
 {
     /**
      * The joins that give a questionnaire_response aliased qr its visit as fe (form_encounter),
      * both left joins: a response with no visit still reads. Grouped by response, so a response
      * saved twice through its form is still one row.
+     *
+     * The visit's lookup reads form_questionnaire_assessments by response_id, which core leaves
+     * unindexed (a TEXT column). This form, a grouped derived table, is the one to use without an
+     * index; with one, joins() picks the correlated lookup, which reads only each response's rows.
      */
     public const JOINS = "
             LEFT JOIN (SELECT vfqa.response_id, MAX(vf.encounter) AS encounter
@@ -31,4 +37,41 @@ final class ResponseVisit
                               AND vf.formdir = 'questionnaire_assessments' AND vf.deleted = 0 AND vf.encounter > 0
                         GROUP BY vfqa.response_id) AS rv ON rv.response_id = qr.response_id
             LEFT JOIN form_encounter AS fe ON fe.encounter = COALESCE(rv.encounter, NULLIF(qr.encounter, 0)) AND fe.pid = qr.patient_id";
+
+    /**
+     * The same visit, looked up per response: the latest undeleted questionnaire form's encounter,
+     * else the response row's own. With an index on response_id this reads a handful of rows per
+     * response; without one it scans the table per response, so it is used only with the index.
+     */
+    public const JOINS_INDEXED = "
+            LEFT JOIN form_encounter AS fe ON fe.encounter = COALESCE((
+                SELECT MAX(vf.encounter)
+                  FROM form_questionnaire_assessments AS vfqa
+                  JOIN forms AS vf ON vf.form_id = vfqa.id AND vf.pid = vfqa.pid
+                       AND vf.formdir = 'questionnaire_assessments' AND vf.deleted = 0 AND vf.encounter > 0
+                 WHERE vfqa.response_id = qr.response_id), NULLIF(qr.encounter, 0)) AND fe.pid = qr.patient_id";
+
+    private static ?bool $indexed = null;
+
+    /** The joins to use: the correlated lookup when response_id is indexed, the grouped one otherwise. */
+    public static function joins(?bool $indexed = null): string
+    {
+        return ($indexed ?? self::indexed()) ? self::JOINS_INDEXED : self::JOINS;
+    }
+
+    /**
+     * Whether form_questionnaire_assessments has an index that starts with response_id: this
+     * module's install adds one (named response_id), and so do other modules or a later core.
+     * Asked once per request.
+     */
+    public static function indexed(): bool
+    {
+        if (self::$indexed === null) {
+            $rows = QueryUtils::fetchRecords(
+                "SHOW INDEX FROM `form_questionnaire_assessments` WHERE `Column_name` = 'response_id' AND `Seq_in_index` = 1"
+            );
+            self::$indexed = $rows !== [];
+        }
+        return self::$indexed;
+    }
 }

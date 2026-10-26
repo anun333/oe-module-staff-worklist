@@ -63,6 +63,18 @@ final class LegacyKeys
     }
 
     /**
+     * The sources whose 0.8.5 keys a list may carry or drop: those it collected. A page collects
+     * only its own tab, and a source it didn't collect would look as if its records listed nothing.
+     *
+     * @param list<string> $collected source ids the list collected
+     * @return list<string>
+     */
+    public static function sourcesFor(array $collected): array
+    {
+        return array_values(array_intersect(self::SOURCES, $collected));
+    }
+
+    /**
      * A MySQL REGEXP matching a 0.8.5 key of these sources: no dot in the ref.
      *
      * @param string[] $sources some of SOURCES
