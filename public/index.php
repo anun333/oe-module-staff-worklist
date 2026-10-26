@@ -21,6 +21,7 @@ use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Core\Header;
 use OpenEMR\Core\OEGlobalsBag;
 use OpenHealthcare\StaffWorklist\Bootstrap;
+use OpenHealthcare\StaffWorklist\CareGaps\MultisiteNote;
 use OpenHealthcare\StaffWorklist\Guide;
 use OpenHealthcare\StaffWorklist\Model\ItemKey;
 use OpenHealthcare\StaffWorklist\Model\ItemState;
@@ -56,6 +57,8 @@ $filter = $filter->withSites($selectedSites);
 
 $result = $service->build($filter, $now);
 $careGapStatus = $service->careGapStatus();
+// OpenEMR 8.2.0 to 8.4.1 ran another site's background jobs against the default site (#14359).
+$multisiteNote = MultisiteNote::applies(OpenEmr::siteDir(), OpenEmr::version(), $careGapStatus['oldestCheck'], $careGapStatus['unchecked'], new \DateTimeImmutable());
 $canAct = AclMain::aclCheckCore('patients', 'med', '', 'write');
 $webroot = OpenEmr::webRoot();
 $moduleUrl = $webroot . Bootstrap::MODULE_INSTALLATION_PATH;
@@ -290,6 +293,9 @@ if ($service->sites->isRestrictionEnabled()) {
                 <?php } ?>
                 <?php if ($careGapStatus['unchecked'] > 0) { ?>
                     <?php echo text((string)$careGapStatus['unchecked']); ?> <?php echo xlt('upcoming visits not checked yet.'); ?>
+                <?php } ?>
+                <?php if ($multisiteNote) { ?>
+                    <?php echo xlt('On a multisite install, OpenEMR 8.2 to 8.4 runs background jobs against the default site, so care gaps here update only when someone uses Check now.'); ?>
                 <?php } ?>
             </span>
             <?php if ($canAct) { ?>
