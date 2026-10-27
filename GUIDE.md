@@ -139,6 +139,8 @@ A denial recorded again because the same remittance was posted twice keeps its f
 
 With the Revenue Cycle module installed, its "Charges to check" tab lists visits where the charges and the chart disagree: a service documented but not billed, or a line billed with nothing behind it. Fix the fee sheet and the row clears the next time the tab is read; if the finding is wrong, dismiss it with a reason. That module's guide describes each check.
 
+With the Title X Report module installed and its confidential visit categories chosen, its "Confidential visits" tab lists visits in those categories that a claim or a statement could expose: one queued or billed to insurance, and one with a balance whose statement would go to a guardian. Check the client agreed to bill insurance, or hold the statement, then dismiss the row with a reason. That module's guide explains both.
+
 ## Care coordinators
 
 ### Follow up a social needs screen
