@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.9.0 (unreleased)
+## 0.9.0 (2026-10-26)
 
 - **Other modules' tabs can be built on the shared contract.** openhealthcare-common 1.5.0 holds the types a tab is made of (`WorkSource`, `WorkItem`, `ItemKey`, `PatientRef`, in `OpenHealthcare\Common\Contract\Worklist`), so a module needn't load this one's classes to add a tab, and can test its tab without the Worklist. The collect event's new `contribute()` takes such a source; its items become the Worklist's own as they're collected, and the same ids are refused as by `addSource()`. `addSource()` with this module's own `WorkSourceInterface` still works, so a module that hasn't moved keeps its tab. Behavioral Health, CCBHC Report and Revenue Cycle have moved; Care Management moves in its next release. README › Tabs from other modules.
 - **The bootstrap also registers the library's contracts under their own prefix,** so where modules copied in by hand carry different copies of the library and an older one registered first, the contracts still load (Composer looks under the longer prefix first).
