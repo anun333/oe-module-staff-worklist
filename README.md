@@ -237,7 +237,7 @@ Who sees what:
 - **Claims follow-up** is there only for users OpenEMR's Billing Manager admits (`acct/eob` or `acct/bill`, with write), the same check that page makes.
 - **Sliding fee re-assessments** is there only when the Sliding Fee Discount module is installed and enabled, for users who can read Demographics (`patients/demo`), the check that module's own due list makes.
 - **Care management, not billed** comes from the Care Management module, which adds it only for users who may see billing (`acct/bill`), the check its month list makes before showing what was billed.
-- **Tabs from other modules** come through the `staff_worklist.collect_sources` event (`src/Event/CollectSourcesEvent.php`): the module adds its work source only for users it admits, with the tab's label and its rows' owner role.
+- **Tabs from other modules** come through the `staff_worklist.collect_sources` event (`src/Event/CollectSourcesEvent.php`): the module adds its work source only for users it admits, with the tab's label and its rows' owner role. See [Tabs from other modules](#tabs-from-other-modules).
 - **Prior authorizations** is there only when OpenEMR's Prior Authorizations module is installed and enabled, for users with `patients/docs`, the check that module's own menu entry makes.
 - **Social needs follow-up** is there for users with `patients/med` write or add-only, the check OpenEMR's SDOH history page makes.
 - **Referral replies** is there only for users with `patients/trans` (0.4.1), the check OpenEMR's transaction page makes from 8.5 (openemr/openemr#14627); without it, the page that records a reply refuses them. On 8.4.1 that page checks nothing, so there the worklist is the stricter of the two. Every stock group with `patients/med` also holds `patients/trans`.
@@ -254,6 +254,22 @@ How that has been checked, on 2026-10-10, on OpenEMR 8.4.1 and current master (8
   6. A user with `patients/med` and not `patients/trans` (the read-only test group) gets no Referral replies tab and no referral rows, while a Clinicians user still sees both. On master, OpenEMR's own transaction page refuses the first user (403) and opens the referral for the second; and as an administrator, a referral's Record reply button opens the patient's chart and then the referral, which OpenEMR's check that the referral belongs to the open chart accepts. Checked 2026-10-19 on 8.4.1 and master 1faefbbeb9; with 0.4.0 on master, this check fails.
 
 The same six are worth repeating in your own install, with your own groups and facilities, before giving staff access: your ACL setup isn't the stock one the checks used.
+
+## Tabs from other modules
+
+Another module adds a tab by listening for `staff_worklist.collect_sources` and handing over a work source, the tab's label and the role that owns its rows. From 0.9.0 the source is built on the shared contract in [openhealthcare-common](https://github.com/anun333/openhealthcare-common) 1.5.0 (`OpenHealthcare\Common\Contract\Worklist`: `WorkSource`, `WorkItem`, `ItemKey`, `PatientRef`), so the module needn't load this one's classes, and is added with the library's `Worklist::contribute()`:
+
+```php
+$dispatcher->addListener(Worklist::COLLECT_SOURCES, function (object $event): void {
+    // Where an older copy of the library loaded first, the contract isn't there: leave the tab out.
+    if (!interface_exists(WorkSource::class) || !AclMain::aclCheckCore('patients', 'med')) {
+        return;
+    }
+    Worklist::contribute($event, new MySource(Worklist::now($event)), xl('My tab'), xl('Clinician'));
+});
+```
+
+Both ways work during the change: this worklist takes a source on the shared contract (`contribute()`) and one built on its own `WorkSourceInterface` (`addSource()`, as before 0.9.0), and a module on the shared contract adds its tab to a worklist from 0.8.0 to 0.8.7 too, through `addSource()`. The plan is in the library's README › Contracts between modules.
 
 ## Compatibility
 

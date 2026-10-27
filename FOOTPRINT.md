@@ -135,10 +135,10 @@ As written in the source; whether they behave correctly for a given user is not 
 
 | part | files | lines |
 |---|---|---|
-| PHP logic (`src/`) | 55 | 5831 |
-| tests (`tests/`, `phpunit.xml.dist`) | 26 | 2306 |
+| PHP logic (`src/`) | 55 | 5856 |
+| tests (`tests/`, `phpunit.xml.dist`) | 26 | 2387 |
 | pages (`public/`) | 5 | 974 |
-| module wiring | 5 | 173 |
+| module wiring | 5 | 178 |
 | tools (`tools/`) | 2 | 131 |
 | install SQL (`sql/`) | 2 | 100 |
 | background job (`background/`) | 1 | 26 |

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.0 (unreleased)
+
+- **Other modules' tabs can be built on the shared contract.** openhealthcare-common 1.5.0 holds the types a tab is made of (`WorkSource`, `WorkItem`, `ItemKey`, `PatientRef`, in `OpenHealthcare\Common\Contract\Worklist`), so a module needn't load this one's classes to add a tab, and can test its tab without the Worklist. The collect event's new `contribute()` takes such a source; its items become the Worklist's own as they're collected, and the same ids are refused as by `addSource()`. `addSource()` with this module's own `WorkSourceInterface` still works, so a module that hasn't moved keeps its tab. Behavioral Health, CCBHC Report and Revenue Cycle have moved; Care Management moves in its next release. README › Tabs from other modules.
+- **The bootstrap also registers the library's contracts under their own prefix,** so where modules copied in by hand carry different copies of the library and an older one registered first, the contracts still load (Composer looks under the longer prefix first).
+- Requires openhealthcare-common 1.5.0.
+- **Checked:**
+  - Unit tests on PHP 8.2 and 8.5 (198; 2 new: a tab on the contract is added through the library's `Worklist::contribute()` and collects as the Worklist's own items with the same keys, for all patients and one; `contribute()` refuses a built-in id and a taken one, and an old-style source can't take a contract tab's id).
+  - On OpenEMR 8.4.1: the worklist smoke (queues, 164 checks), and the contributors' own checks, whose Worklist lines name their tabs' exact items: Behavioral Health, CCBHC Report and Revenue Cycle on the contract, and Care Management still on `addSource()`. All passed.
+  - With the first library copy loaded being 1.4.0's (no contracts): the contract tabs still list their items through the prefix; with every module's prefix line taken out (the control) they're left out and the page still opens.
+  - Contract tabs on Worklist 0.8.7 (master stack, its own 1.4.0 copy): the same three checks pass, through `addSource()`.
+
 ## 0.8.7 (2026-10-26)
 
 - **Faster: a page collects only the tab it shows.** Every page collected every tab, so each tab took as long as all of them together: 49 to 53 seconds on a synthetic copy with 20,000 patients, 200,000 visits and 195,327 claims, plus Revenue Cycle's tab when that module is on. Now a tab collects itself and **Results to sign** (for the overdue banner); **All** still collects everything. The other tabs show the count kept from the last 10 minutes for that user, view, scope and sites (hover for when it was counted, with the oldest time in a line under the list), or **…** until the page counts them one at a time after it loads (`public/counts.php`). An action taken in the worklist drops that tab's kept counts for everyone. The **Sites** menu counts the tab shown. Counts are kept in a new table, `staff_worklist_count`; until the upgrade SQL has run, every other tab is counted after the page loads. See README › Tab counts.
