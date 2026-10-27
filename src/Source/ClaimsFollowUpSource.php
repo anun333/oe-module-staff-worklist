@@ -82,6 +82,10 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
         foreach (QueryUtils::fetchRecords($sql, $binds) as $row) {
             $rows[$row['pid'] . ':' . $row['encounter']] = $row;
         }
+        foreach (self::firstDenials(array_values(array_filter($rows, static fn(array $r): bool => (int)$r['status'] === ClaimRecord::STATUS_DENIED))) as $key => $first) {
+            $rows[$key]['version'] = $first['version'];
+            $rows[$key]['bill_time'] = $first['bill_time'];
+        }
 
         $flagSql = "SELECT a.pid, a.encounter, a.follow_up_note, a.post_time, $encounterColumns
             FROM ar_activity AS a
@@ -154,6 +158,42 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
     }
 
     /**
+     * For each denied claim, the version and time its denial was first recorded (ClaimRules::firstOfSameDenial()),
+     * read from all of its versions.
+     *
+     * @param list<array<string, mixed>> $denied the latest versions that are denials
+     * @return array<string, array{version: int, bill_time: string}> by pid:encounter
+     */
+    private static function firstDenials(array $denied): array
+    {
+        $out = [];
+        foreach (array_chunk($denied, 500) as $chunk) {
+            $pids = array_values(array_unique(array_map(static fn(array $r): int => (int)$r['pid'], $chunk)));
+            $encounters = array_values(array_unique(array_map(static fn(array $r): int => (int)$r['encounter'], $chunk)));
+            $versions = [];
+            foreach (QueryUtils::fetchRecords(
+                'SELECT patient_id, encounter_id, version, status, payer_id, payer_type, process_file, bill_time FROM claims
+                  WHERE patient_id IN (' . implode(', ', array_fill(0, count($pids), '?')) . ')
+                    AND encounter_id IN (' . implode(', ', array_fill(0, count($encounters), '?')) . ')
+                  ORDER BY version DESC',
+                [...$pids, ...$encounters]
+            ) as $v) {
+                $versions[$v['patient_id'] . ':' . $v['encounter_id']][] = ['version' => (int)$v['version'], 'status' => (int)$v['status'],
+                    'payer_id' => (int)$v['payer_id'], 'payer_type' => (int)$v['payer_type'], 'process_file' => (string)($v['process_file'] ?? ''),
+                    'bill_time' => (string)$v['bill_time']];
+            }
+            foreach ($chunk as $r) {
+                $key = $r['pid'] . ':' . $r['encounter'];
+                $first = ClaimRules::firstOfSameDenial($versions[$key] ?? []);
+                if ($first !== null) {
+                    $out[$key] = $first;
+                }
+            }
+        }
+        return $out;
+    }
+
+    /**
      * @param array{kind: string, priority: int, since: \DateTimeImmutable, flagged: bool} $decision
      * @param array<string, mixed>                                                      $row
      */
@@ -194,7 +234,9 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
             }
         } elseif ($decision['kind'] === ClaimRules::PARTLY_POSTED) {
             $facts[] = $this->xl('Last posted') . ' ' . oeFormatShortDate($decision['since']->format('Y-m-d'));
-            $facts[] = $this->xl('A line OpenEMR could not post stops the rest of the claim from posting and leaves the insurance open');
+            // Since 8.4.1 a line OpenEMR won't post stops the rest of the claim's posting; since 8.6 an ERA that reverses
+            // a payment re-opens its level (#14851), and a pended line (reason 133) leaves it open (#14859).
+            $facts[] = $this->xl('The insurance is open after a posting: a line OpenEMR could not post, a payment the payer reversed, or a line the payer pended for review');
         } elseif (in_array($decision['kind'], [ClaimRules::UPLOAD_FAILED, ClaimRules::NOT_SENT], true) && $claim->upload !== null) {
             $upload = $claim->upload;
             $facts[] = $this->xl('Queued') . ' ' . oeFormatShortDate($upload['at']->format('Y-m-d'));

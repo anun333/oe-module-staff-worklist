@@ -121,6 +121,33 @@ final class ClaimRules
     }
 
     /**
+     * The version a denial was first recorded at. Before #14848 (OpenEMR 8.6), posting an ERA again records each
+     * denial in it again, as a new claims version with status 7 and the same payer, level and reasons, so the latest
+     * version and its time move while the denial stays the same. Walking back from the latest version while each
+     * earlier one is that same denial, the first of the run keeps the item's key (and a dismissal made on it) and the
+     * date it was denied. A version that is anything else (billed again, another payer, level or reasons) ends the run.
+     *
+     * @param list<array{version: int, status: int, payer_id: int, payer_type: int, process_file: string, bill_time: string}> $versions the claim's versions, latest first
+     * @return array{version: int, bill_time: string}|null null when the latest version isn't a denial
+     */
+    public static function firstOfSameDenial(array $versions): ?array
+    {
+        $latest = $versions[0] ?? null;
+        if ($latest === null || $latest['status'] !== ClaimRecord::STATUS_DENIED) {
+            return null;
+        }
+        $first = $latest;
+        foreach (array_slice($versions, 1) as $v) {
+            if ($v['status'] !== ClaimRecord::STATUS_DENIED || $v['payer_id'] !== $latest['payer_id']
+                || $v['payer_type'] !== $latest['payer_type'] || $v['process_file'] !== $latest['process_file']) {
+                break;
+            }
+            $first = $v;
+        }
+        return ['version' => $first['version'], 'bill_time' => $first['bill_time']];
+    }
+
+    /**
      * The denial reasons OpenEMR keeps in claims.process_file: "code_modifier_group_reason",
      * comma-separated, one per adjustment on each service line. Malformed entries are skipped.
      *

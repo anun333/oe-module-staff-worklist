@@ -190,4 +190,23 @@ final class ClaimRulesTest extends TestCase
     {
         return $decision === null ? null : [$decision['kind'], $decision['priority']];
     }
+    public function testADenialRecordedAgainByARepostedEraKeepsItsFirstVersion(): void
+    {
+        $v = static fn(int $version, int $status, string $reasons = '99213__CO_197', int $payer = 3, int $level = 1): array =>
+            ['version' => $version, 'status' => $status, 'payer_id' => $payer, 'payer_type' => $level, 'process_file' => $reasons, 'bill_time' => "2026-10-0$version 09:00:00"];
+
+        // Billed (1), denied (2), then the same ERA posted twice more (3, 4): the denial is version 2's.
+        $this->assertSame(['version' => 2, 'bill_time' => '2026-10-02 09:00:00'],
+            ClaimRules::firstOfSameDenial([$v(4, 7), $v(3, 7), $v(2, 7), $v(1, 2)]));
+        $this->assertSame(['version' => 3, 'bill_time' => '2026-10-03 09:00:00'],
+            ClaimRules::firstOfSameDenial([$v(4, 7), $v(3, 7), $v(2, 7, '99213__CO_16')]), 'other reasons are another denial');
+        $this->assertSame(['version' => 4, 'bill_time' => '2026-10-04 09:00:00'],
+            ClaimRules::firstOfSameDenial([$v(4, 7), $v(3, 7, payer: 5)]), 'another payer is another denial');
+        $this->assertSame(['version' => 4, 'bill_time' => '2026-10-04 09:00:00'],
+            ClaimRules::firstOfSameDenial([$v(4, 7), $v(3, 7, level: 2)]), 'another level is another denial');
+        $this->assertSame(['version' => 4, 'bill_time' => '2026-10-04 09:00:00'],
+            ClaimRules::firstOfSameDenial([$v(4, 7), $v(3, 2), $v(2, 7)]), 'billed again in between: a new denial');
+        $this->assertNull(ClaimRules::firstOfSameDenial([$v(4, 2), $v(3, 7)]), 'the latest version is not a denial');
+        $this->assertNull(ClaimRules::firstOfSameDenial([]));
+    }
 }

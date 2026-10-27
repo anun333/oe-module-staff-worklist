@@ -170,7 +170,7 @@ The tab lists claims that need billing staff, at most one row per visit:
 | Claim file still waiting | The latest upload that carried the claim has been waiting, or stuck mid-upload, for more than 24 hours, which usually means the SFTP background service isn't running | Normal |
 | No payer response | The latest claim was billed to an insurer more than 45 days ago, that insurance level isn't closed, and no payment or adjustment has been posted at that level since | Normal; High after 90 days |
 | Line written off with a denial reason | A remittance adjusted a line off ("Adjust code NN", as OpenEMR posts it), paid nothing for it, and gave a reason other than the contractual 45 or 59. OpenEMR before 8.4.1 posted a line denial that way; since openemr/openemr#11868 (in 8.4.1) it refuses to post one | High |
-| Remittance left the insurance open | A payment or adjustment was posted at the claim's level more than 30 days ago and the level is still open. Since 8.4.1, a line OpenEMR won't post stops the rest of that claim's posting and leaves the level open, so this is how such a claim shows | Normal |
+| Remittance left the insurance open | A payment or adjustment was posted at the claim's level more than 30 days ago and the level is still open. Since 8.4.1, a line OpenEMR won't post stops the rest of that claim's posting and leaves the level open; from 8.6, an ERA that reverses a payment re-opens its level (#14851), and a line the payer pends (reason 133) would leave it open (#14859, open). The row names all three | Normal |
 | Flagged for follow-up | Someone ticked **Follow Up** on a line in payment posting | Normal |
 
 - **What each row shows:** the payer and the service date, when the claim was billed or denied, the denial reason codes with their descriptions (from OpenEMR's own list), and the follow-up note.
@@ -222,6 +222,8 @@ composer require anun333/oe-module-staff-worklist
 ```
 
 The installer plugin places it in `interface/modules/custom_modules/oe-module-staff-worklist/`. Without Composer, copy this directory there instead. A copied module carries its own `vendor/anun333/openhealthcare-common`; every module copied this way must carry the same version of it, because the first module to load serves its copy to all of them (Composer keeps one copy for the site, so this applies to copies only).
+
+**After adding, upgrading or removing a module copied in by hand, restart the container (or Apache).** OpenEMR's official Docker images (8.0.0 to 8.5.0) keep in APCu which file holds each class, and each class they didn't find, across requests: until a restart, a class once not found stays not found, and a removed module's classes still point at its folder. An OpenEMR built from source without Composer's `--apcu-autoloader` has no such cache.
 
 Then go to Modules › Manage Modules › Unregistered, and **Register**, **Install** and **Enable** it. A **Worklist** menu entry appears next to Messages. Enabling it also switches on the background service for care gaps; disabling switches it off.
 

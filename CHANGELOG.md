@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.1 (unreleased)
+
+- **A denial recorded again keeps its row.** Before OpenEMR 8.6 (#14848), posting the same ERA again records each denial in it again, as a new claim version. The Claims follow-up row took the newest version for its key and date, so a dismissed denial came back after a re-post and its "Denied" date moved to the re-post. The row now keeps the version the denial was first recorded at, as long as each later version is the same denial (same payer, level and reasons); billing again, or a different denial, still makes a new row.
+- **"Remittance posted, insurance still open" names its possible causes.** Its explanation said the cause was a line OpenEMR couldn't post. From 8.6 an ERA that reverses a payment re-opens the insurance level (#14851), and a pended line (reason 133) would leave it open (#14859, open), so the row now names all three.
+- **Checked against core's other ERA changes:** #14856 (patient-responsibility notes keep their reason code) changes no memo this module reads; write-offs are still read from "Adjust code" adjustments.
+- **The staff guide** covers the tabs other modules add (Behavioral Health, CCBHC Report, Revenue Cycle, Care Management).
+- **Install note:** restart the container after adding, upgrading or removing a module copied in by hand (OpenEMR's official 8.0.0 to 8.5.0 images keep class locations, and classes not found, in APCu).
+
 ## 0.9.0 (2026-10-26)
 
 - **Other modules' tabs can be built on the shared contract.** openhealthcare-common 1.5.0 holds the types a tab is made of (`WorkSource`, `WorkItem`, `ItemKey`, `PatientRef`, in `OpenHealthcare\Common\Contract\Worklist`), so a module needn't load this one's classes to add a tab, and can test its tab without the Worklist. The collect event's new `contribute()` takes such a source; its items become the Worklist's own as they're collected, and the same ids are refused as by `addSource()`. `addSource()` with this module's own `WorkSourceInterface` still works, so a module that hasn't moved keeps its tab. Behavioral Health, CCBHC Report and Revenue Cycle have moved; Care Management moves in its next release. README › Tabs from other modules.
