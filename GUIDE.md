@@ -14,7 +14,7 @@ It opens on **Mine** and **Open**.
 - **Mine**, **Unassigned** or **Everyone**: whose work. Mine is work assigned to you, or yours as its owner (the ordering provider, say) when nobody else is assigned. Unassigned is work with nobody, such as claims to follow up.
 - **Open**, **Snoozed** or **Dismissed**: which items.
 - **Sites**: tick sites and choose **Apply**, or **All sites**. Your choice is remembered.
-- The tabs: **All**, then one for each kind of work, with counts. You see only the tabs your permissions allow.
+- The tabs: **All**, then one for each kind of work, with counts, including tabs other modules add (each is described below under the staff it serves). You see only the tabs your permissions allow.
   - The tab you're on is counted when the page opens. The others may show a count from up to 10 minutes ago: hover over one to see when it was counted, and the line under the list gives the oldest. **…** means the tab is being counted.
   - The numbers in the **Sites** menu are for the tab you're on.
 
@@ -88,7 +88,16 @@ An outgoing referral is listed 14 days after it was sent if it still has no repl
 
 *What it doesn't do:* it can't open the Counter-Referral tab for you.
 
+### Review treatment plans when due
+
+With the Behavioral Health module installed, its "Treatment plan reviews" tab lists each treatment plan whose review is due soon or overdue, owned by the clinician. Recording the review on the patient's treatment plan page clears the row. That module's guide describes the review.
+
 ## Front desk
+
+### Book evaluations for new requests
+
+With the CCBHC Report module installed, its "Requests for services" tab lists each logged request for services with no initial evaluation yet, with the business days since it came in. One past its time (10 business days for a routine request, 1 for an urgent one) is high priority. Book the evaluation; recording the evaluation visit clears the row.
+
 
 ### Re-assess sliding fee patients
 
@@ -124,6 +133,10 @@ For a claim file that wasn't sent, the row shows the upload's status, the file a
 
 *What it doesn't do:* it shows how long ago a claim was denied, not an appeal deadline, since those differ by payer.
 
+### Check charges against the record
+
+With the Revenue Cycle module installed, its "Charges to check" tab lists visits where the charges and the chart disagree: a service documented but not billed, or a line billed with nothing behind it. Fix the fee sheet and the row clears the next time the tab is read; if the finding is wrong, dismiss it with a reason. That module's guide describes each check.
+
 ## Care coordinators
 
 ### Follow up a social needs screen
@@ -139,4 +152,4 @@ A patient's latest positive social needs screen of a kind, from the last 180 day
 
 ### Care management months not billed
 
-With the Care Management module installed, it adds its own tab here for months that met a code and weren't billed, owned by the billing practitioner. Its README describes it.
+With the Care Management module installed, its "Care management, not billed" tab lists months that met a code and weren't billed, owned by the billing practitioner. That module's guide describes it.
