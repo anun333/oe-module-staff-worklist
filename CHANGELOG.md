@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.2 (unreleased)
+
+- **On OpenEMR older than 8.1.0, the module's pages say so instead of showing a blank page.** The module needs 8.1.0 or later and stays switched off below it, but a page opened from a bookmark or a typed address still ran and stopped with an empty HTTP 500. Each page now answers with a short page naming the version the module needs and the site's version (found installing every module on a fresh 7.0.2).
+
 ## 0.9.1 (2026-10-26)
 
 - **A denial recorded again keeps its row.** Before OpenEMR 8.6 (#14848), posting the same ERA again records each denial in it again, as a new claim version. The Claims follow-up row took the newest version for its key and date, so a dismissed denial came back after a re-post and its "Denied" date moved to the re-post. The row now keeps the version the denial was first recorded at, as long as each later version is the same denial (same payer, level and reasons); billing again, or a different denial, still makes a new row.

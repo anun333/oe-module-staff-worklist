@@ -13,6 +13,7 @@
 
 // globals.php opens the session read-only and closes it at once, so slow counts don't hold it.
 require_once __DIR__ . '/../../../../globals.php';
+require_once __DIR__ . '/../floor-guard.php';
 
 use OpenEMR\Common\Acl\AclMain;
 use OpenEMR\Common\Session\SessionWrapperFactory;
