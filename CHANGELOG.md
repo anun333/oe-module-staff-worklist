@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.9.1 (unreleased)
+## 0.9.1 (2026-10-26)
 
 - **A denial recorded again keeps its row.** Before OpenEMR 8.6 (#14848), posting the same ERA again records each denial in it again, as a new claim version. The Claims follow-up row took the newest version for its key and date, so a dismissed denial came back after a re-post and its "Denied" date moved to the re-post. The row now keeps the version the denial was first recorded at, as long as each later version is the same denial (same payer, level and reasons); billing again, or a different denial, still makes a new row.
 - **"Remittance posted, insurance still open" names its possible causes.** Its explanation said the cause was a line OpenEMR couldn't post. From 8.6 an ERA that reverses a payment re-opens the insurance level (#14851), and a pended line (reason 133) would leave it open (#14859, open), so the row now names all three.
