@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.8.7 (unreleased)
+## 0.8.7 (2026-10-26)
 
 - **Faster: a page collects only the tab it shows.** Every page collected every tab, so each tab took as long as all of them together: 49 to 53 seconds on a synthetic copy with 20,000 patients, 200,000 visits and 195,327 claims, plus Revenue Cycle's tab when that module is on. Now a tab collects itself and **Results to sign** (for the overdue banner); **All** still collects everything. The other tabs show the count kept from the last 10 minutes for that user, view, scope and sites (hover for when it was counted, with the oldest time in a line under the list), or **…** until the page counts them one at a time after it loads (`public/counts.php`). An action taken in the worklist drops that tab's kept counts for everyone. The **Sites** menu counts the tab shown. Counts are kept in a new table, `staff_worklist_count`; until the upgrade SQL has run, every other tab is counted after the page loads. See README › Tab counts.
 - **Faster: screening and social needs.** They find each response's visit through core's `form_questionnaire_assessments.response_id`, an unindexed TEXT column. Install and the 0.8.6 to 0.8.7 upgrade add a guarded index, `response_id` (`response_id`(64)), the same one the UDS, Title X and CCBHC modules add, so whichever runs first creates it. With the index, the visit is looked up per response; without it, the grouped lookup stays, since the per-response one is slower there (25.1 against 21.7 seconds).
