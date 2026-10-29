@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.3 (unreleased)
+
+- **A line the payer pended for review is no longer a write-off.** An insurer that pends a line (adjustment reason 133, "pending further review") hasn't decided it yet. OpenEMR before 8.4.1 posts that as an "Adjust code 133" adjustment, so the Claims follow-up tab listed it as a line written off with a denial reason, High, and counted it as the payer's answer. It now counts as no answer: the claim stays unanswered, and shows as no response once it is old enough. From OpenEMR 8.6, core doesn't post a pended line at all (openemr/openemr#14859), so every version now reads the same. Checked both ways end to end on 8.4.1 (dev/worklist_claims_check.py).
+- **The staff guide** covers Title X Report's "Confidential visits" tab, and says what a pended line means.
+
 ## 0.9.2 (2026-10-27)
 
 - **On OpenEMR older than 8.1.0, the module's pages say so instead of showing a blank page.** The module needs 8.1.0 or later and stays switched off below it, but a page opened from a bookmark or a typed address still ran and stopped with an empty HTTP 500. Each page now answers with a short page naming the version the module needs and the site's version (found installing every module on a fresh 7.0.2).

@@ -100,6 +100,7 @@ final class ClaimRulesTest extends TestCase
         $this->assertSame('B7', ClaimRules::writeOffReason(' Adjust code B7 '));
         $this->assertNull(ClaimRules::writeOffReason('Adjust code 45'), 'contractual');
         $this->assertNull(ClaimRules::writeOffReason('Adjust code 59'), 'contractual');
+        $this->assertNull(ClaimRules::writeOffReason('Adjust code 133'), 'pended by the payer: not its answer (#14859)');
         $this->assertNull(ClaimRules::writeOffReason('Ins1 dedbl: 20.00'));
         $this->assertNull(ClaimRules::writeOffReason('Sliding fee discount'));
         $this->assertNull(ClaimRules::writeOffReason('Adjust code'));

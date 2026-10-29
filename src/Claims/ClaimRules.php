@@ -6,7 +6,10 @@
  *    (status 7, nothing posted), with nothing posted at that level since and the level open;
  *  - written off: a remittance adjusted a line off, paying nothing for it, with a reason
  *    other than the contractual 45 or 59. OpenEMR before 8.4.1 posted such a line denial as an
- *    "Adjust code" adjustment; since #11868 (in 8.4.1) it refuses to post it, as here;
+ *    "Adjust code" adjustment; since #11868 (in 8.4.1) it refuses to post it, as here. A payer's
+ *    "pending further review" (133) isn't its answer: core before 8.4.1 posted it as an adjustment
+ *    too, and from 8.6 (#14859) doesn't post it at all. It is neither a write-off nor a posting, so a
+ *    claim with only that stays unanswered;
  *  - not sent: the claim file OpenEMR queued for its SFTP upload to an X12 partner failed
  *    (settings, the local file, login, the remote folder, or from 8.5.0 the upload itself), so
  *    the insurer never got it; or it is still queued long after, which means the upload
@@ -44,6 +47,8 @@ final class ClaimRules
     public const NOT_SENT = 'not_sent';
     /** Adjustment reasons OpenEMR treats as contractual write-offs (CO-45, CO-59) when a line is paid nothing. */
     public const CONTRACTUAL = ['45', '59'];
+    /** "The disposition of this service line is pending further review" (CARC 133): the payer hasn't decided yet. */
+    public const PENDED = ['133'];
     /** Each condition's digit in an item key (ItemKey); fixed, since saved dismissals carry it. */
     public const KEY_DIGITS = [
         self::DENIED => 1, self::NO_RESPONSE => 2, self::FLAGGED => 3, self::WRITTEN_OFF => 4,
@@ -172,7 +177,7 @@ final class ClaimRules
      */
     public static function writeOffReason(string $memo): ?string
     {
-        if (preg_match('/^Adjust code (\w+)$/', trim($memo), $m) !== 1 || in_array($m[1], self::CONTRACTUAL, true)) {
+        if (preg_match('/^Adjust code (\w+)$/', trim($memo), $m) !== 1 || in_array($m[1], [...self::CONTRACTUAL, ...self::PENDED], true)) {
             return null;
         }
         return $m[1];

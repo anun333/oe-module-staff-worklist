@@ -54,17 +54,19 @@ final class ClaimsFollowUpSource implements WorkSourceInterface
         $encounterColumns = "fe.id AS fe_id, fe.date AS service_date, fe.facility_id AS site_id, fe.sensitivity,
                 COALESCE(fe.last_level_closed, 0) AS last_level_closed, " . PatientRef::SQL_COLUMNS;
 
+        // A payer's pended line ("Adjust code 133", as core before 8.4.1 posts it) isn't its answer (ClaimRules::PENDED).
+        $pendedMemos = implode(', ', array_map(static fn(string $code): string => "'Adjust code $code'", ClaimRules::PENDED));
         // The latest version of each encounter's claim, and whether anything was posted at its level since.
         $sql = "SELECT c.patient_id AS pid, c.encounter_id AS encounter, c.version, c.status, c.payer_type, c.bill_time, c.process_file,
                 ic.name AS payer_name,
                 EXISTS (SELECT 1 FROM ar_activity AS a
                     WHERE a.pid = c.patient_id AND a.encounter = c.encounter_id AND a.deleted IS NULL
                       AND a.payer_type = c.payer_type AND a.post_time >= c.bill_time
-                      AND (a.pay_amount <> 0 OR a.adj_amount <> 0)) AS posted_since,
+                      AND (a.pay_amount <> 0 OR (a.adj_amount <> 0 AND COALESCE(TRIM(a.memo), '') NOT IN ($pendedMemos)))) AS posted_since,
                 (SELECT MAX(a.post_time) FROM ar_activity AS a
                     WHERE a.pid = c.patient_id AND a.encounter = c.encounter_id AND a.deleted IS NULL
                       AND a.payer_type = c.payer_type AND a.post_time >= c.bill_time
-                      AND (a.pay_amount <> 0 OR a.adj_amount <> 0)) AS last_posted,
+                      AND (a.pay_amount <> 0 OR (a.adj_amount <> 0 AND COALESCE(TRIM(a.memo), '') NOT IN ($pendedMemos)))) AS last_posted,
                 $encounterColumns
             FROM claims AS c
             JOIN (SELECT patient_id, encounter_id, MAX(version) AS version FROM claims GROUP BY patient_id, encounter_id) AS latest

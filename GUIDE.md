@@ -123,7 +123,7 @@ One row per visit, for claims billed or denied in the last 365 days:
 - denied (**High**);
 - a claim file OpenEMR's automatic SFTP upload didn't send to the clearinghouse (**High**), or one still waiting to be sent after a day;
 - billed over 45 days ago with nothing posted since (**High** after 90 days);
-- a line written off with a denial reason (**High**);
+- a line written off with a denial reason (**High**). A line the payer pended for review (reason 133) isn't a write-off: the payer hasn't decided yet, so the claim counts as unanswered;
 - a remittance posted over 30 days ago that left the insurance open: a line OpenEMR couldn't post, a payment the payer reversed, or a line the payer pended for review;
 - a line flagged for follow-up in payment posting.
 
